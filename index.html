@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Order online | Perfect Digital, East Ham</title>
+<meta name="description" content="Print your phone photos and make personalised cards online. Made in our East Ham shop, ready for you to collect.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Order online | Perfect Digital">
+<meta property="og:description" content="Photo prints and personalised cards from your phone, made in our East Ham shop.">
+<meta property="og:url" content="https://order.perfect.digital/">
+<meta property="og:image" content="https://order.perfect.digital/img/cards.jpg">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/fredoka-600.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Fredoka"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/fredoka-600.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/montserrat-400.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/montserrat-600.woff2) format("woff2"); }
+:root {
+  --paper: #FAF8F4;
+  --surface: #FFFFFF;
+  --ink: #161A17;
+  --muted: #5F665F;
+  --line: #E6E1D8;
+  --green: #17803A;
+  --red: #C8102E;
+  --focus: #1D6FD8;
+  --display: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+  --body: "Montserrat", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); -webkit-text-size-adjust: 100%; }
+a { color: inherit; }
+.wrap { max-width: 1000px; margin: 0 auto; padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
+.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+.top img { display: block; height: 22px; width: auto; }
+.phone { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.phone a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.hero { padding: 30px 0 4px; }
+.hero h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.1rem, 8vw, 3.1rem); line-height: 1.05; margin: 0 0 10px; }
+.hero p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 42ch; text-wrap: pretty; }
+.products { display: grid; gap: 18px; padding: 24px 0 6px; }
+@media (min-width: 760px) { .products { grid-template-columns: 1fr 1fr; gap: 22px; } }
+.product { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; text-decoration: none; color: inherit; box-shadow: 0 1px 2px rgba(22, 26, 23, 0.05); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.product:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(22, 26, 23, 0.10); }
+.product:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.product img { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; object-fit: cover; background: #EEE; }
+.product .body { display: flex; flex-direction: column; gap: 6px; flex: 1; padding: 16px 18px 18px; }
+.product h2 { font-family: var(--display); font-weight: 600; font-size: 1.6rem; line-height: 1.1; margin: 0; }
+.product p { margin: 0; color: var(--muted); text-wrap: pretty; }
+.product .price { color: var(--ink); font-weight: 600; }
+.product .season { color: var(--red); font-weight: 600; font-size: 0.92rem; }
+.product .go { margin-top: auto; padding-top: 10px; }
+.go span { display: inline-block; min-height: 46px; padding: 12px 20px; border-radius: 999px; background: var(--green); color: #fff; font-weight: 600; line-height: 22px; }
+.product.cards .go span { background: var(--red); }
+.how { padding: 28px 0 4px; }
+.how h2 { font-family: var(--display); font-weight: 600; font-size: 1.4rem; margin: 0 0 12px; }
+.how ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+@media (min-width: 760px) { .how ol { grid-template-columns: repeat(3, 1fr); } }
+.how li { counter-increment: step; position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 14px 58px; }
+.how li::before { content: counter(step); position: absolute; left: 16px; top: 13px; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; font: 600 0.95rem/28px var(--display); text-align: center; }
+footer { margin-top: 32px; padding: 22px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer p { margin: 0 0 6px; }
+footer b { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .product { transition: none; } .product:hover { transform: none; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="https://www.perfect.digital/"><img src="img/logo.png" alt="Perfect Digital" width="155" height="22"></a>
+  <div class="phone">Questions? <a href="tel:02085529419">020 8552 9419</a></div>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Order online</h1>
+    <p>Print your phone photos and make your own cards. We make them in our East Ham shop, ready for you to collect.</p>
+  </section>
+
+  <section class="products" aria-label="What you can order">
+    <a class="product prints" href="prints/">
+      <img src="img/prints.jpg" width="1200" height="720" alt="Three photo prints">
+      <div class="body">
+        <h2>Photo prints</h2>
+        <p>Send photos from your phone. 6x4 up to A4, gloss or lustre, printed while you wait or ready the next day.</p>
+        <p class="price">Pay when you collect. The more you print, the less each print costs.</p>
+        <div class="go"><span>Print my photos &rsaquo;</span></div>
+      </div>
+    </a>
+    <a class="product cards" href="cards/">
+      <img src="img/cards.jpg" width="1200" height="720" alt="Three personalised cards: birthday, Christmas and a party invitation">
+      <div class="body">
+        <h2>Personalised cards</h2>
+        <p>Christmas, birthday, party invitations, new baby, wedding and anniversary cards with your own photo and words.</p>
+        <p class="price">&pound;5 a card, or packs from 10 for &pound;30.</p>
+        <p class="season" id="season" hidden>Christmas packs: last orders 18 December.</p>
+        <div class="go"><span>Make a card &rsaquo;</span></div>
+      </div>
+    </a>
+  </section>
+
+  <section class="how" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <ol>
+      <li>Choose your photos or card design on your phone.</li>
+      <li>Send your order to the shop. We print it here.</li>
+      <li>Collect from 211 High Street North, East Ham, E6&nbsp;1JG.</li>
+    </ol>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <p><b>Perfect Digital</b>, 211 High Street North, East Ham, London E6 1JG &middot; <a href="tel:02085529419">020 8552 9419</a> &middot; <a href="https://www.perfect.digital/">perfect.digital</a></p>
+  <p>Your photos and details are deleted 30 days after your order.</p>
+</div></footer>
+
+<script>
+  // Christmas packs close on 18 December (the card maker and its script use the same day).
+  (function () {
+    var d = new Date(), m = d.getMonth();
+    if (m === 10 || (m === 11 && d.getDate() <= 18)) document.getElementById('season').hidden = false;
+  })();
+</script>
+</body>
+</html>
