@@ -62,6 +62,9 @@ a { color: inherit; }
 @media (min-width: 760px) { .how ol { grid-template-columns: repeat(3, 1fr); } }
 .how li { counter-increment: step; position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 14px 58px; }
 .how li::before { content: counter(step); position: absolute; left: 16px; top: 13px; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; font: 600 0.95rem/28px var(--display); text-align: center; }
+.more { padding: 18px 0 0; }
+.more p { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; text-wrap: pretty; }
+.more a { font-weight: 600; text-decoration: none; white-space: nowrap; }
 footer { margin-top: 32px; padding: 22px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
 footer p { margin: 0 0 6px; }
 footer b { color: var(--ink); }
@@ -100,6 +103,10 @@ footer b { color: var(--ink); }
         <div class="go"><span>Make a card &rsaquo;</span></div>
       </div>
     </a>
+  </section>
+
+  <section class="more" aria-label="Gifts, canvases and posters">
+    <p><b>Gifts, canvases and posters:</b> call <a href="tel:02085529419">020 8552 9419</a> or pop in.</p>
   </section>
 
   <section class="how" aria-labelledby="how-title">
