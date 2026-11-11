@@ -513,6 +513,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     LOW_DPI: 100,                                  // below this it gets a "will look blurry" warning
     CLOSED_WEEKDAYS: [0],                          // 0 = Sunday
     CLOSED_DATES: ['2026-12-25', '2026-12-26', '2027-01-01'],
+    OPEN_HOURS: [10, 19],                          // the shop's hours in London time: 10am to 7pm
     READY_FROM: '10am'
   };
   const SHOP_PHONE = '020 8552 9419';
@@ -596,6 +597,22 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       if (!CONFIG.CLOSED_WEEKDAYS.includes(d.getDay()) && !CONFIG.CLOSED_DATES.includes(ymd)) return d;
     }
     return d;
+  }
+  // Is the shop open right now? Worked out in London time, whatever the phone's clock is set to.
+  function shopOpenNow(now) {
+    const p = {};
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+      .formatToParts(now || new Date()).forEach(x => { p[x.type] = x.value; });
+    const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday);
+    const hour = Number(p.hour) % 24;
+    return !CONFIG.CLOSED_WEEKDAYS.includes(dow) && !CONFIG.CLOSED_DATES.includes(p.year + '-' + p.month + '-' + p.day) &&
+      hour >= CONFIG.OPEN_HOURS[0] && hour < CONFIG.OPEN_HOURS[1];
+  }
+  // "I'm in the shop now" is only offered while the shop is open. Outside those hours the order is for collecting later.
+  function showCollectChoices() {
+    const open = shopOpenNow(), waiting = $('collect-waiting');
+    waiting.closest('label').hidden = !open;
+    if (!open) { waiting.checked = false; $('collect-later').checked = true; }
   }
   function laterText() {
     const d = nextOpenDay(new Date());
@@ -1043,6 +1060,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     tot.querySelector('.amt').textContent = pounds(t.total);
     box.appendChild(tot);
     $('later-text').textContent = laterText();
+    showCollectChoices();
   }
 
   /* ---------- making the order ---------- */
@@ -1168,6 +1186,10 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     const name = $('cust-name').value.trim(), phone = $('cust-phone').value.trim(), email = $('cust-email').value.trim();
     const collect = collectChoice();
     if (!collect) return fail("Choose whether you're in the shop now or collecting later.");
+    if (collect === 'waiting' && !shopOpenNow()) {
+      showCollectChoices();
+      return fail("The shop is closed now, so we've changed your order to collect later. Check when it will be ready, then send it again.");
+    }
     if (!name) return fail('Add your name so we know whose photos these are.');
     if (phone.replace(/\D/g, '').length < 10) return fail("Check your mobile number. We need it in case there's a problem with a photo.");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Check your email address, or leave it blank.');
