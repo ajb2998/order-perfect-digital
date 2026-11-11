@@ -147,6 +147,11 @@ footer { margin-top: 28px; padding: 20px 0 32px; border-top: 1px solid var(--lin
 footer p { margin: 0 0 6px; }
 .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } .tile:hover { transform: none; } }
+.payways { margin: 12px 0 4px; }
+.payways .sub { margin-top: 0; }
+.payways .chips { flex-direction: column; }
+.payways .chip { width: 100%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left; border-radius: 14px; padding: 10px 14px; min-height: 54px; font-weight: 600; }
+.payways .chip small { font-weight: 400; }
 
 </style>
 </head>
@@ -1083,7 +1088,7 @@ PD.CATALOGUE = {
       { id: '16x20', w: 20, h: 16, price: 65, lam: 90, frame: 45 },
       { id: '16x24', w: 24, h: 16, price: 75, lam: 100, frame: 50 },
       { id: '20x30', w: 30, h: 20, price: 95, lam: 120, frame: 55 },
-      { id: '24x36', w: 36, h: 24, price: 160, lam: 180, frame: 75 },
+      { id: '24x36', w: 36, h: 24, price: 160, lam: 185, frame: 75 },   // laminated = the Large laminate modifier in SumUp, +25 (Arshan, 11 Nov)
     ],
     edges: [
       { id: 'blurmirror', name: 'Blurred mirror', note: 'The edge of your photo, mirrored and softly blurred round the sides.' },
@@ -1235,6 +1240,8 @@ PD.unitPrice = function (it) {
   // Why orders can't be taken just now ('' when they can). Shown across the top and on the basket, so nobody
   // designs a whole order and only finds out when they press Pay.
   let closed = '';
+  // How the customer may pay, as the order script says: online, and at the counter while the shop is open.
+  let WAYS = { online: true, shop: false };
   const CLOSED_TEXT = 'Online ordering for these products isn\u2019t available just now. Please call us on ' + PHONE + ' or pop in.';
   function setClosed(msg) {
     closed = msg || '';
@@ -1253,7 +1260,7 @@ PD.unitPrice = function (it) {
     if (!openCheck) {
       openCheck = (async () => {
         for (let tries = 0; tries < 2; tries++) {
-          try { const s = await call('getSetup'); setClosed(s && s.online ? '' : CLOSED_TEXT); return !closed; }
+          try { const s = await call('getSetup'); WAYS = { online: !!(s && s.online), shop: !!(s && s.shop) }; setClosed(WAYS.online || WAYS.shop ? '' : CLOSED_TEXT); return !closed; }
           catch (e) { if (tries === 0) await PD.sleep(2500); }
         }
         setClosed(CLOSED_TEXT); return false;
@@ -1342,7 +1349,7 @@ PD.unitPrice = function (it) {
       el('a', { class: 'back', href: 'https://order.perfect.digital/' }, '‹ Order online: prints and cards'),
       el('section', { class: 'hero' },
         el('h1', {}, SHOP ? 'Canvas print file maker' : (GIFTS_LIVE ? 'Canvases, posters and gifts' : 'Canvases, posters and mugs')),
-        el('p', {}, SHOP ? 'For the shop: make a QuickPro canvas file at 300 dpi, like MyMo.' : 'Choose something, add your photos and see it before you buy. We make it in our East Ham shop, ready for you to collect. You pay online before we make it.')));
+        el('p', {}, SHOP ? 'For the shop: make a QuickPro canvas file at 300 dpi, like MyMo.' : 'Choose something, add your photos and see it before you buy. We make it in our East Ham shop, ready for you to collect. Pay online, or at the counter if you\u2019re in the shop.')));
     if (SHOP) { open('canvas'); return; }
     const fams = [
       ['canvas', 'Canvas prints', 'from ' + PD.money(C.canvas.sizes[0].price), 'Ready the next working day'],
@@ -1359,7 +1366,7 @@ PD.unitPrice = function (it) {
       tiles.append(el('a', { class: 'tile', href: '#' + id }, pic, el('div', { class: 'tb' }, el('h2', {}, name), el('p', { class: 'from' }, from), el('p', {}, note))));
     }
     app.append(tiles, el('div', { class: 'how' },
-      el('b', {}, 'How it works: '), 'add your photos and choose the options, then put it in your basket. Pay online, and we make it in the shop. Canvases are ready the next working day; ' + (GIFTS_LIVE ? 'posters, mugs and gifts' : 'posters and mugs') + ' the same day if you order before 12pm (subject to stock). Questions? Call ', el('a', { href: 'tel:02085529419' }, PHONE), '.'),
+      el('b', {}, 'How it works: '), 'add your photos and choose the options, then put it in your basket. Pay online, or at the counter if you\u2019re in the shop, and we make it once it\u2019s paid. Canvases are ready the next working day; ' + (GIFTS_LIVE ? 'posters, mugs and gifts' : 'posters and mugs') + ' the same day if you order before 12pm (subject to stock). Questions? Call ', el('a', { href: 'tel:02085529419' }, PHONE), '.'),
       GIFTS_LIVE || SHOP ? '' : el('p', { class: 'hint', style: { marginTop: '14px' } }, el('b', {}, 'Cushions, jigsaws, keyrings and other photo gifts: '), 'call ', el('a', { href: 'tel:02085529419' }, PHONE), ' or pop in.'));
   }
   // Simple drawn pictures for the tiles (sample photos are drawn in once they load).
@@ -1918,19 +1925,32 @@ PD.unitPrice = function (it) {
     const name = el('input', { id: 'c-name', autocomplete: 'name', required: true }), mobile = el('input', { id: 'c-mob', type: 'tel', autocomplete: 'tel', inputmode: 'tel', required: true }), email = el('input', { id: 'c-email', type: 'email', autocomplete: 'email' });
     const status = el('div', { class: 'status', hidden: true, role: 'status' });
     const pay = el('button', { type: 'button', class: 'btn wide', 'data-pay': '1', disabled: closed ? true : null, 'data-closed': closed ? '1' : null }, 'Pay ' + PD.money(total()) + ' now');
+    // Pay now, or pay at the counter for a customer who is in the shop (offered while the shop is open).
+    let how = 'online';
+    const label = () => { pay.textContent = how === 'shop' ? 'Send my order to the shop' : 'Pay ' + PD.money(total()) + ' now'; };
+    const ways = chips([{ v: 'online', label: 'Pay now', small: 'card, Apple Pay or Google Pay' }, { v: 'shop', label: 'I\u2019m in the shop', small: 'pay at the counter' }], how, v => { how = v; label(); });
+    const waysBox = el('div', { class: 'payways', hidden: true }, el('div', { class: 'sub' }, 'How would you like to pay?'), ways,
+      el('p', { class: 'hint' }, 'In the shop? Pay at the counter and we\u2019ll start making your order once you\u2019ve paid.'));
+    const showWays = () => {
+      if (!WAYS.online && WAYS.shop) how = 'shop';
+      if (!WAYS.shop) how = 'online';
+      waysBox.hidden = !(WAYS.online && WAYS.shop);
+      ways.set(how); label();
+    };
     if (closed) { status.hidden = false; status.className = 'status err'; status.textContent = closed; }
-    checkOpen().then(ok => { if (!status.isConnected) return; if (!ok) { status.hidden = false; status.className = 'status err'; status.textContent = closed; } else if (status.textContent === CLOSED_TEXT) status.hidden = true; });
+    checkOpen().then(ok => { if (!status.isConnected) return; showWays(); if (!ok) { status.hidden = false; status.className = 'status err'; status.textContent = closed; } else if (status.textContent === CLOSED_TEXT) status.hidden = true; });
     app.append(list, el('div', { class: 'total' }, el('span', {}, 'Total'), el('span', {}, PD.money(total()))),
       el('p', { class: 'lead-note' }, 'Ready to collect ' + PD.dayText(ready) + (basket.some(i => i.lead === 'sameday') ? ' (order before 12pm for same-day items; subject to stock)' : '') + ', from 211 High Street North, East Ham E6 1JG.'),
       el('section', { class: 'step' }, el('h2', {}, 'Your details'),
         el('div', { class: 'field' }, el('label', { for: 'c-name' }, 'Name'), name),
         el('div', { class: 'field' }, el('label', { for: 'c-mob' }, 'Mobile number'), mobile),
         el('div', { class: 'field' }, el('label', { for: 'c-email' }, 'Email (for your receipt)'), email),
-        el('p', { class: 'hint' }, 'You pay online with Stripe before we make anything. If we can\u2019t make something, we\u2019ll contact you and refund you in full. Your photos and details are deleted 30 days after your order; Stripe keeps its own payment records.'),
+        waysBox,
+        el('p', { class: 'hint' }, 'We make your order once it\u2019s paid for: online with Stripe, or at the counter if you\u2019re in the shop. If we can\u2019t make something, we\u2019ll contact you and refund you in full. Your photos and details are deleted 30 days after your order; Stripe keeps its own payment records.'),
         status, pay));
-    pay.addEventListener('click', () => checkout({ name: name.value.trim(), mobile: mobile.value.trim(), email: email.value.trim() }, status, pay));
+    pay.addEventListener('click', () => checkout({ name: name.value.trim(), mobile: mobile.value.trim(), email: email.value.trim() }, status, pay, how));
   }
-  async function checkout(cust, status, btn) {
+  async function checkout(cust, status, btn, how) {
     const fail = m => { status.hidden = false; status.className = 'status err'; status.textContent = m; };
     if (closed) return fail(closed);
     if (!cust.name) return fail('Add your name, so we know whose order it is.');
@@ -1946,7 +1966,7 @@ PD.unitPrice = function (it) {
         made.push(r); bar.style.width = Math.round((i + 1) / basket.length * 100) + '%';
       }
       if (TEST) return showTest(cust, made);
-      await sendOrder(cust, made, status, bar);
+      await sendOrder(cust, made, status, bar, how === 'shop' ? 'shop' : 'online');
     } catch (e) { fail((e && e.message) || 'Something went wrong. Please try again, or call us on ' + PHONE + '.'); btn.disabled = false; }
   }
   // Test version: nothing is sent. Shows what the shop would get, with the files to save.
@@ -1979,7 +1999,7 @@ PD.unitPrice = function (it) {
     return basket.map(it => ({ product: it.product, size: it.size || '', orient: (it.settings && it.settings.orient) || '', item: it.item || '', variant: it.variant || '',
       laminate: !!it.laminate, frame: it.frame || '', qty: it.qty, desc: [it.title, it.desc].filter(Boolean).join(': '), settings: it.settings }));
   }
-  async function sendOrder(cust, made, status, bar) {
+  async function sendOrder(cust, made, status, bar, how) {
     status.firstChild.textContent = 'Sending your order…'; bar.style.width = '0%';
     const items = orderItems(), sig = JSON.stringify([cust, items]);
     if (!sent || sent.sig !== sig) sent = { sig, token: newToken() };
@@ -2002,9 +2022,9 @@ PD.unitPrice = function (it) {
       }
       bar.style.width = Math.round((i + 1) / basket.length * 100) + '%';
     }
-    status.firstChild.textContent = 'Opening the payment page…';
-    const fin = await call('finishOrder', { order: start.orderNo, token: sent.token, payment: 'online', returnUrl: pageUrl() });
-    if (fin && fin.status === 'paid') { basket.length = 0; renderBar(); pending.set(null); return thanks(fin); }
+    status.firstChild.textContent = how === 'shop' ? 'Sending your order to the shop…' : 'Opening the payment page…';
+    const fin = await call('finishOrder', { order: start.orderNo, token: sent.token, payment: how, returnUrl: pageUrl() });
+    if (fin && (fin.status === 'paid' || fin.status === 'shop')) { basket.length = 0; renderBar(); pending.set(null); return thanks(fin); }
     if (!fin || !fin.payUrl) throw new Error('Paying online is not working just now. Please call us on ' + PHONE + '.');
     basket.length = 0;   // it is with the shop now: no "leave this page?" question on the way to Stripe
     pending.set({ order: start.orderNo, token: sent.token, at: Date.now() });
@@ -2032,7 +2052,7 @@ PD.unitPrice = function (it) {
     app.append(el('div', { class: 'ptitle' }, el('h1', {}, 'Your order')), msg);
     try {
       const r = q.get('paid') ? await call('confirmPayment', { session: q.get('paid') }) : await call('confirmPayment', { order: q.get('unpaid'), token: q.get('t') });
-      if (r.status === 'paid') { pending.set(null); return thanks(r); }
+      if (r.status === 'paid' || r.status === 'shop') { pending.set(null); return thanks(r); }
       if (r.status === 'unpaid' && q.get('unpaid')) { pending.set({ order: r.orderNo || q.get('unpaid'), token: q.get('t'), at: Date.now() }); return unpaid(r, q.get('t')); }
       if (r.status === 'gone') pending.set(null);
       app.innerHTML = '';
@@ -2044,6 +2064,15 @@ PD.unitPrice = function (it) {
   }
   function thanks(r) {
     app.innerHTML = '';
+    if (r.status === 'shop') {
+      // In the shop: nothing is made until it is paid for at the counter.
+      app.append(el('div', { class: 'ptitle' }, el('h1', {}, 'Your order is with the shop')),
+        el('p', {}, 'Your order number is ', el('b', {}, r.orderNo), '. Please pay ', el('b', {}, PD.money(r.total)), ' at the counter now and we\u2019ll start making it.'),
+        el('p', {}, 'Once it\u2019s paid, ' + (r.count > 1 ? 'they will be' : 'it will be') + ' ready to collect on ', el('b', {}, r.readyText), '. Any questions, ask at the counter or call us on ', el('a', { href: 'tel:' + PHONE.replace(/\s/g, '') }, PHONE), '.'),
+        el('a', { class: 'btn', href: '#' }, 'Order something else'));
+      window.scrollTo(0, 0);
+      return;
+    }
     app.append(el('div', { class: 'ptitle' }, el('h1', {}, 'Thank you, your order is paid')),
       el('p', {}, 'Your order number is ', el('b', {}, r.orderNo), '. ' + (r.count > 1 ? 'They will be' : 'It will be') + ' ready to collect on ', el('b', {}, r.readyText), ', from 211 High Street North, East Ham E6 1JG.'),
       el('p', {}, 'Please bring your order number. Any questions, call us on ', el('a', { href: 'tel:' + PHONE.replace(/\s/g, '') }, PHONE), '.'),
@@ -2058,14 +2087,21 @@ PD.unitPrice = function (it) {
       pay.disabled = true; status.hidden = false; status.className = 'status'; status.textContent = 'Opening the payment page…';
       try {
         const p = await call('retryPayment', { order: r.orderNo, token, returnUrl: pageUrl() });
-        if (p.status === 'paid') { pending.set(null); return thanks(p); }
+        if (p.status === 'paid' || p.status === 'shop') { pending.set(null); return thanks(p); }
         pending.set({ order: r.orderNo, token, at: Date.now() });
         location.href = p.payUrl;
       } catch (e) { status.className = 'status err'; status.textContent = e.message; pay.disabled = false; }
     });
+    // In the shop (offered while it is open): pay at the counter instead.
+    const counter = (r.payments || []).includes('shop') ? el('button', { type: 'button', class: 'btn alt wide', style: { marginTop: '10px' } }, 'I\u2019m in the shop: pay at the counter') : null;
+    if (counter) counter.addEventListener('click', async () => {
+      counter.disabled = true; pay.disabled = true; status.hidden = false; status.className = 'status'; status.textContent = 'Sending your order to the shop…';
+      try { const p = await call('payInShop', { order: r.orderNo, token }); pending.set(null); thanks(p); }
+      catch (e) { status.className = 'status err'; status.textContent = e.message; counter.disabled = false; pay.disabled = false; }
+    });
     app.append(el('div', { class: 'ptitle' }, el('h1', {}, 'Your order isn’t paid yet')),
       el('p', {}, 'Nothing has been taken from your card. We keep order ', el('b', {}, r.orderNo), ' (' + r.count + (r.count === 1 ? ' item' : ' items') + ') for today, so you can pay without making it again.'),
-      status, pay, el('p', { class: 'hint' }, 'We only make orders once they are paid. Any questions, call us on ' + PHONE + '.'), el('a', { class: 'btn alt', href: '#', style: { marginTop: '14px' }, onclick: () => { pending.set(null); if (location.hash === '' || location.hash === '#') open(''); } }, 'Start again'));
+      status, pay, counter, el('p', { class: 'hint' }, 'We only make orders once they are paid. Any questions, call us on ' + PHONE + '.'), el('a', { class: 'btn alt', href: '#', style: { marginTop: '14px' }, onclick: () => { pending.set(null); if (location.hash === '' || location.hash === '#') open(''); } }, 'Start again'));
   }
 
   /* ---------- routing ---------- */

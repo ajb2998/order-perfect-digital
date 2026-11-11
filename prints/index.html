@@ -303,7 +303,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     <div class="hero">
       <p class="eyebrow">Photo prints · East Ham</p>
       <h1 id="start-title">Print your phone photos</h1>
-      <p class="lead">Choose your photos, check how each print will look, and we print them in the shop on Fujifilm photo paper. You pay when you collect.</p>
+      <p class="lead">Choose your photos, check how each print will look, and we print them in the shop on Fujifilm photo paper. <span id="pay-lead">You pay when you collect.</span></p>
     </div>
     <div class="cta">
       <label for="pick" class="btn btn-primary btn-big" id="pick-label" role="button" tabindex="0">Choose photos</label>
@@ -395,8 +395,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     <div class="field">
       <span class="label" id="collect-label">Collecting</span>
       <div class="choices" role="radiogroup" aria-labelledby="collect-label">
-        <label class="choice"><input type="radio" name="collect" id="collect-waiting" value="waiting"><span><b>I'm in the shop now</b><span>We'll print them while you wait.</span></span></label>
-        <label class="choice"><input type="radio" name="collect" id="collect-later" value="later"><span><b>I'll collect later</b><span id="later-text">Ready the next day we're open.</span></span></label>
+        <label class="choice"><input type="radio" name="collect" id="collect-waiting" value="waiting"><span><b>I'm in the shop now</b><span>Pay at the counter and we'll print them while you wait.</span></span></label>
+        <label class="choice"><input type="radio" name="collect" id="collect-later" value="later"><span><b id="later-title">I'll collect later</b><span id="later-text">Ready the next day we're open.</span></span></label>
       </div>
     </div>
 
@@ -417,7 +417,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     <label class="check"><input type="checkbox" id="offers"><span>Send me occasional offers from Perfect Digital. You can stop them at any time.</span></label>
     <label class="check"><input type="checkbox" id="checked"><span>I've checked my photos, the crops and the number of copies.</span></label>
 
-    <p class="small muted">You pay when you collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details for your order, and we delete them 30 days after it. If you ask for offers, we keep your name and contact details to send them until you ask us to stop.</p>
+    <p class="small muted"><span id="pay-small">You pay when you collect from</span> Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). <span id="pay-stripe" hidden>Card payments are handled by Stripe, which keeps its own payment records. </span>We only use your photos and details for your order, and we delete them 30 days after it. If you ask for offers, we keep your name and contact details to send them until you ask us to stop.</p>
     <p class="error" id="order-error" role="alert"></p>
     <button class="btn btn-primary btn-block btn-big" type="button" id="send">Send my photos to the shop</button>
     <div class="progress" id="progress" hidden>
@@ -524,6 +524,11 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwpuU2um557nX9JraIFr_e7MFnb86ZxMU38bcQsnuRVzdGnL7DKek2btTWBupxdpmGP/exec';
   const isOwnSite = !isAppsScript && /(^|\.)perfect\.digital$|\.github\.io$/.test(location.hostname);
   const isLive = !!isAppsScript || isOwnSite;
+  // Paying online (Stripe) is offered on the shop's own address once the order script says it is switched on.
+  // Then every order is either paid online, or placed by a customer in the shop who pays at the counter first.
+  let ONLINE = false;
+  let setupReady = Promise.resolve();
+  const pageUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
   const state = {
     photos: [], size: CONFIG.DEFAULT_SIZE, finish: FINISHES[0], mode: 'fill',
     step: 'start', editing: null, lastZip: null, busy: false, queue: [], working: 0
@@ -613,6 +618,22 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     const open = shopOpenNow(), waiting = $('collect-waiting');
     waiting.closest('label').hidden = !open;
     if (!open) { waiting.checked = false; $('collect-later').checked = true; }
+    showPayWords();
+  }
+  function payChoice() { return ONLINE && collectChoice() === 'later' ? 'online' : 'collect'; }
+  // The words that depend on how the order is paid for.
+  function showPayWords() {
+    const t = totals(), c = collectChoice();
+    $('pay-lead').textContent = ONLINE ? "Pay online, or at the counter if you're in the shop." : 'You pay when you collect.';
+    $('collect-label').textContent = ONLINE ? 'Paying and collecting' : 'Collecting';
+    $('later-title').textContent = ONLINE ? 'Pay now, collect later' : "I'll collect later";
+    $('later-text').textContent = (ONLINE ? 'Card, Apple Pay or Google Pay. ' : '') + laterText();
+    $('pay-small').textContent = ONLINE ? 'Collect from' : 'You pay when you collect from';
+    $('pay-stripe').hidden = !ONLINE;
+    const tot = $('sum-total-label');
+    if (tot) tot.textContent = c === 'waiting' ? 'To pay at the counter' : (ONLINE ? (c === 'later' ? 'To pay now' : 'Total') : 'To pay when you collect');
+    if (isLive && !state.busy) $('send').textContent = payChoice() === 'online' ? 'Send my photos and pay ' + pounds(t.total) : 'Send my photos to the shop';
+    $('dk-sub').textContent = pounds(t.total) + (ONLINE ? ' · pay online or in the shop' : ' · pay when you collect');
   }
   function laterText() {
     const d = nextOpenDay(new Date());
@@ -888,7 +909,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     const t = totals();
     const loading = state.photos.some(p => p.status === 'loading');
     $('dk-count').textContent = t.prints + (t.prints === 1 ? ' print' : ' prints');
-    $('dk-sub').textContent = pounds(t.total) + ' · pay when you collect';
+    $('dk-sub').textContent = pounds(t.total) + (ONLINE ? ' · pay online or in the shop' : ' · pay when you collect');
     $('dk-next').disabled = loading || t.prints === 0;
     $('dk-next').textContent = loading ? 'Opening…' : 'Next';
     renderSettings();
@@ -1056,10 +1077,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       box.appendChild(row);
     }
     const tot = document.createElement('div'); tot.className = 'line total';
-    tot.innerHTML = '<span class="what"><b>To pay when you collect</b></span><span class="amt"></span>';
+    tot.innerHTML = '<span class="what"><b id="sum-total-label">To pay when you collect</b></span><span class="amt"></span>';
     tot.querySelector('.amt').textContent = pounds(t.total);
     box.appendChild(tot);
-    $('later-text').textContent = laterText();
     showCollectChoices();
   }
 
@@ -1183,6 +1203,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   async function submit() {
     if (state.busy) return;
     $('order-error').textContent = '';
+    await setupReady;
     const name = $('cust-name').value.trim(), phone = $('cust-phone').value.trim(), email = $('cust-email').value.trim();
     const collect = collectChoice();
     if (!collect) return fail("Choose whether you're in the shop now or collecting later.");
@@ -1206,7 +1227,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       placed: now.toISOString(),
       placedText: now.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       customer: { name: name.slice(0, 60), phone: phone.slice(0, 20), email: email.slice(0, 80), offers: $('offers').checked },
-      collect, readyText: collect === 'waiting' ? 'While you wait' : laterText(),
+      collect, pay: payChoice(), readyText: collect === 'waiting' ? 'While you wait' : laterText(),
       lines: t.lines.map(l => ({ size: l.size.file, paper: l.paper, prints: l.prints, photos: l.photos, unit: l.unit, amount: l.amount })),
       total: t.total, prints: t.prints, photos: t.photos
     };
@@ -1287,7 +1308,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   async function sendLive(order, files) {
     setProgress(3, 'Contacting the shop…');
     const started = await run('startPhotoOrder', {
-      customer: order.customer, collect: order.collect, total: order.total, prints: order.prints, specs: folderSpecs(files)
+      customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files)
     });
     order.orderNo = started.orderNo;
     // Two prints are made and sent at a time.
@@ -1307,10 +1328,104 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     setProgress(5, 'Sending print 1 of ' + files.length + '…');
     await Promise.all([worker(), worker()]);
     if (failed) throw failed;
-    setProgress(97, 'Finishing your order…');
-    const res = await runRetry('finishPhotoOrder', started.token);
+    setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : 'Finishing your order…');
+    const res = await runRetry('finishPhotoOrder', started.token, pageUrl());
+    if (res && res.status === 'pay') {
+      // The photos are with the shop's order script; they reach the shop once Stripe says the order is paid.
+      if (!res.payUrl) throw new Error("Paying online isn't working just now. Please call us on " + SHOP_PHONE + '.');
+      pending.set({ order: res.orderNo, token: started.token, at: Date.now() });
+      state.leaving = true;   // no "leave this page?" question on the way to Stripe
+      location.assign(res.payUrl);
+      return;
+    }
     setProgress(100, 'Sent');
     showDone(Object.assign(order, res || {}), 'sent');
+  }
+
+  /* ---------- paying online: back from Stripe ---------- */
+  // The order that has gone to Stripe, remembered for this tab, so the Back button finds it again.
+  const PENDING = 'pd-prints-pending';
+  const pending = {
+    get() { try { const v = JSON.parse(sessionStorage.getItem(PENDING) || 'null'); return v && v.order && v.token && Date.now() - v.at < 20 * 3600 * 1000 ? v : null; } catch (e) { return null; } },
+    set(v) { try { if (v) sessionStorage.setItem(PENDING, JSON.stringify(v)); else sessionStorage.removeItem(PENDING); } catch (e) { /* private browsing: the page just starts afresh */ } }
+  };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  function doneBox() {
+    state.busy = false; state.leaving = false; $('send').disabled = false; $('progress').hidden = true;
+    const box = $('done'); box.textContent = '';
+    const add = (tag, text, cls) => { const el = document.createElement(tag); if (cls) el.className = cls; el.textContent = text; box.appendChild(el); return el; };
+    go('done');
+    return { box, add };
+  }
+  function startAgainButton(box) {
+    const fresh = document.createElement('button'); fresh.type = 'button'; fresh.className = 'btn btn-ghost'; fresh.textContent = 'Start a new order';
+    fresh.addEventListener('click', () => { pending.set(null); resetAll(); }); box.appendChild(fresh);
+  }
+  // Back from Stripe: ?paid=SESSION after paying, ?unpaid=ORDER&t=TOKEN after leaving without paying. The page
+  // always asks the order script, which asks Stripe; it never takes the address's word for it.
+  async function backFromStripe(prm) {
+    try { history.replaceState(null, '', pageUrl()); } catch (e) { /* fine */ }
+    const mine = pending.get();
+    const token = prm.t || (mine && mine.token) || '';
+    const { box, add } = doneBox();
+    add('p', 'Checking your payment…', 'muted');
+    try {
+      let r;
+      for (let i = 0; i < 5; i++) {
+        r = await runRetry('confirmPhotoPayment', prm.paid ? { session: prm.paid } : { order: prm.unpaid, token: token });
+        if (r.status === 'paid' || r.status === 'sent') { pending.set(null); return showDone(r, 'sent'); }
+        if (r.status === 'gone') {
+          pending.set(null); box.textContent = '';
+          add('h2', 'This order has expired');
+          add('p', 'Nothing was taken from your card. Please send your photos again, or call us on ' + SHOP_PHONE + '.', 'muted');
+          return startAgainButton(box);
+        }
+        if (!prm.paid || r.status === 'expired') break;
+        await sleep(2500);   // just paid: Stripe can take a moment to confirm
+      }
+      if (prm.paid && r.status !== 'expired') {
+        box.textContent = '';
+        add('h2', "We're still waiting for your payment");
+        add('p', 'If you paid, we will have it in a few minutes and print order ' + (r.orderNo || '') + ' as usual. If you are not sure, please call us on ' + SHOP_PHONE + '.', 'muted');
+        return;
+      }
+      showUnpaid(r, token);
+    } catch (e) {
+      box.textContent = '';
+      add('p', cleanError(e), 'error');
+      add('p', 'If you paid, your order is safe. Questions? Call us on ' + SHOP_PHONE + '.', 'muted');
+    }
+  }
+  function showUnpaid(r, token) {
+    const { box, add } = doneBox();
+    add('p', 'Your order number', 'small muted');
+    add('p', r.orderNo || '', 'orderno');
+    add('h2', "Your order isn't paid for yet");
+    add('p', 'Your photos are safe with us, and nothing has been taken from your card. We print them once the order is paid for' + (r.total ? ' (' + pounds(r.total) + ')' : '') + '.', 'muted');
+    const err = add('p', '', 'error'); err.setAttribute('role', 'alert');
+    if (!token) { add('p', 'Please call us on ' + SHOP_PHONE + ' and we will sort it out.', 'muted'); return startAgainButton(box); }
+    pending.set({ order: r.orderNo, token: token, at: Date.now() });
+    const buttons = [];
+    const press = (b, fn) => b.addEventListener('click', async () => {
+      buttons.forEach(x => { x.disabled = true; }); err.textContent = '';
+      try { await fn(); } catch (e) { err.textContent = cleanError(e); buttons.forEach(x => { x.disabled = false; }); }
+    });
+    const pay = document.createElement('button'); pay.type = 'button'; pay.className = 'btn btn-primary btn-block btn-big'; pay.id = 'pay-again';
+    pay.textContent = 'Pay ' + (r.total ? pounds(r.total) + ' ' : '') + 'now';
+    press(pay, async () => {
+      const p = await runRetry('retryPhotoPayment', { order: r.orderNo, token: token, returnUrl: pageUrl() });
+      if (p.status === 'pay') { state.leaving = true; location.assign(p.payUrl); return; }
+      pending.set(null); showDone(p, 'sent');
+    });
+    box.appendChild(pay); buttons.push(pay);
+    if (shopOpenNow()) {
+      const shop = document.createElement('button'); shop.type = 'button'; shop.className = 'btn btn-ghost btn-block'; shop.id = 'pay-in-shop'; shop.style.marginTop = '10px';
+      shop.textContent = "I'm in the shop now: pay at the counter";
+      press(shop, async () => { const p = await runRetry('payPhotoInShop', { order: r.orderNo, token: token }); pending.set(null); showDone(p, 'sent'); });
+      box.appendChild(shop); buttons.push(shop);
+    }
+    add('p', 'If you leave it, we delete your photos after a day and nothing is charged. Questions? Call us on ' + SHOP_PHONE + '.', 'small muted');
+    startAgainButton(box);
   }
 
   function showDone(order, how) {
@@ -1335,11 +1450,19 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     } else {
       add('p', 'Your order number', 'small muted');
       add('p', order.orderNo || 'Sent', 'orderno');
-      add('h2', order.collect === 'waiting' ? "We're printing your photos now" : 'Your photos are with the shop');
-      add('p', (order.collect === 'waiting' ? 'Show this number at the counter. ' : order.readyText + ' ') + pounds(order.total) + ' to pay when you collect.', 'muted');
+      if (order.paid) {
+        add('h2', order.collect === 'waiting' ? "We're printing your photos now" : 'Thank you, your order is paid');
+        add('p', (order.collect === 'waiting' ? 'Show this number at the counter. ' : order.readyText + ' ') + pounds(order.total) + ' paid online, so there is nothing more to pay.', 'muted');
+      } else if (order.collect === 'waiting') {
+        add('h2', 'Now pay at the counter');
+        add('p', 'Show this number at the counter and pay ' + pounds(order.total) + ". We'll print your photos while you wait, once you've paid.", 'muted');
+      } else {
+        add('h2', 'Your photos are with the shop');
+        add('p', order.readyText + ' ' + pounds(order.total) + ' to pay when you collect.', 'muted');
+      }
       add('p', 'Questions? Call us on ' + SHOP_PHONE + '.', 'small muted');
       const fresh = document.createElement('button'); fresh.type = 'button'; fresh.className = 'btn btn-ghost'; fresh.textContent = 'Start a new order';
-      fresh.addEventListener('click', resetAll); box.appendChild(fresh);
+      fresh.addEventListener('click', () => { pending.set(null); resetAll(); }); box.appendChild(fresh);
     }
     go('done');
   }
@@ -1451,7 +1574,19 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     });
     document.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
     document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
-    window.addEventListener('beforeunload', e => { if (state.photos.length && state.step !== 'done') { e.preventDefault(); e.returnValue = ''; } });
+    window.addEventListener('beforeunload', e => { if (state.photos.length && state.step !== 'done' && !state.leaving) { e.preventDefault(); e.returnValue = ''; } });
+    document.querySelectorAll('input[name="collect"]').forEach(r => r.addEventListener('change', showPayWords));
+
+    // Paying online: ask the order script whether it is switched on, and pick up an order coming back from Stripe.
+    if (isOwnSite) {
+      setupReady = runRetry('getSetup').then(s => { ONLINE = !!(s && s.online); showPayWords(); }).catch(() => { /* the page carries on without it */ });
+      const q = new URLSearchParams(location.search);
+      const mine = pending.get();
+      if (q.get('paid') || q.get('unpaid')) backFromStripe({ paid: q.get('paid'), unpaid: q.get('unpaid'), t: q.get('t') });
+      else if (mine) backFromStripe({ unpaid: mine.order, t: mine.token });
+      // The Back button from Stripe can bring this page back exactly as it was left, still "sending".
+      window.addEventListener('pageshow', e => { const p = pending.get(); if (e.persisted && p) backFromStripe({ unpaid: p.order, t: p.token }); });
+    }
   }
   init();
 })();
