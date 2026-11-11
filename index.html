@@ -25,6 +25,7 @@
   --line: #E6E1D8;
   --green: #17803A;
   --red: #C8102E;
+  --blue: #1F5FA8;
   --focus: #1D6FD8;
   --display: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
   --body: "Montserrat", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -39,6 +40,7 @@ a { color: inherit; }
 .top img { display: block; height: 34px; width: auto; }
 .phone { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
 .phone a { color: var(--ink); font-weight: 600; text-decoration: none; }
+@media (max-width: 359px) { .phone .q { display: none; } }
 .hero { padding: 30px 0 4px; }
 .hero h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.1rem, 8vw, 3.1rem); line-height: 1.05; margin: 0 0 10px; }
 .hero p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 42ch; text-wrap: pretty; }
@@ -56,15 +58,17 @@ a { color: inherit; }
 .product .go { margin-top: auto; padding-top: 10px; }
 .go span { display: inline-block; min-height: 46px; padding: 12px 20px; border-radius: 999px; background: var(--green); color: #fff; font-weight: 600; line-height: 22px; }
 .product.cards .go span { background: var(--red); }
+.product.gifts .go span { background: var(--blue); }
+@media (min-width: 760px) { .product.gifts { grid-column: 1 / -1; flex-direction: row; } .product.gifts img { width: 50%; flex: none; } .product.gifts .body { padding: 22px 24px; } }
+.more { padding: 18px 0 0; }
+.more p { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; text-wrap: pretty; }
+.more a { font-weight: 600; text-decoration: none; white-space: nowrap; }
 .how { padding: 28px 0 4px; }
 .how h2 { font-family: var(--display); font-weight: 600; font-size: 1.4rem; margin: 0 0 12px; }
 .how ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
 @media (min-width: 760px) { .how ol { grid-template-columns: repeat(3, 1fr); } }
 .how li { counter-increment: step; position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 14px 58px; }
 .how li::before { content: counter(step); position: absolute; left: 16px; top: 13px; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; font: 600 0.95rem/28px var(--display); text-align: center; }
-.more { padding: 18px 0 0; }
-.more p { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; text-wrap: pretty; }
-.more a { font-weight: 600; text-decoration: none; white-space: nowrap; }
 footer { margin-top: 32px; padding: 22px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
 footer p { margin: 0 0 6px; }
 footer b { color: var(--ink); }
@@ -74,13 +78,13 @@ footer b { color: var(--ink); }
 <body>
 <header class="top"><div class="wrap">
   <a href="https://www.perfect.digital/"><img src="img/pd-logo.svg" alt="Perfect Digital" width="129" height="34"></a>
-  <div class="phone">Questions? <a href="tel:02085529419">020 8552 9419</a></div>
+  <div class="phone"><span class="q">Questions? </span><a href="tel:02085529419">020 8552 9419</a></div>
 </div></header>
 
 <main class="wrap">
   <section class="hero">
     <h1>Order online</h1>
-    <p>Print your phone photos and make your own cards. We make them in our East Ham shop, ready for you to collect.</p>
+    <p>Print your phone photos, make your own cards, and order canvases, posters and mugs. We make them in our East Ham shop, ready for you to collect.</p>
   </section>
 
   <section class="products" aria-label="What you can order">
@@ -89,7 +93,7 @@ footer b { color: var(--ink); }
       <div class="body">
         <h2>Photo prints</h2>
         <p>Send photos from your phone. 6x4 up to A4, gloss or lustre, printed while you wait or ready the next day.</p>
-        <p class="price">Pay when you collect. The more you print, the less each print costs.</p>
+        <p class="price">The more you print, the less each print costs.</p>
         <div class="go"><span>Print my photos &rsaquo;</span></div>
       </div>
     </a>
@@ -103,16 +107,25 @@ footer b { color: var(--ink); }
         <div class="go"><span>Make a card &rsaquo;</span></div>
       </div>
     </a>
+    <a class="product gifts" href="products/">
+      <img src="img/products.jpg" width="1200" height="720" alt="A canvas print and a photo mug">
+      <div class="body">
+        <h2>Canvases, posters and mugs</h2>
+        <p>Canvas prints, posters and photo mugs with your own photos. See it on screen before you buy.</p>
+        <p class="price">Canvases from &pound;25, posters from &pound;20, mugs &pound;15. Pay online, or at the counter if you're in the shop.</p>
+        <div class="go"><span>Make yours &rsaquo;</span></div>
+      </div>
+    </a>
   </section>
 
-  <section class="more" aria-label="Gifts, canvases and posters">
-    <p><b>Gifts, canvases and posters:</b> call <a href="tel:02085529419">020 8552 9419</a> or pop in.</p>
+  <section class="more" aria-label="Other photo gifts">
+    <p><b>Cushions, jigsaws and other photo gifts:</b> call <a href="tel:02085529419">020 8552 9419</a> or pop in.</p>
   </section>
 
   <section class="how" aria-labelledby="how-title">
     <h2 id="how-title">How it works</h2>
     <ol>
-      <li>Choose your photos or card design on your phone.</li>
+      <li>Choose your photos, card design, canvas, poster or mug on your phone.</li>
       <li>Send your order to the shop. We print it here.</li>
       <li>Collect from 211 High Street North, East Ham, E6&nbsp;1JG.</li>
     </ol>
