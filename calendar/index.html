@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Photo calendars</title>
+<meta name="description" content="Make a photo calendar with your own photos and dates, printed in our East Ham shop.">
+<link rel="icon" href="../favicon.png">
+<style>
+@font-face { font-family: "Fredoka"; font-weight: 600; font-display: swap; src: url(../fonts/fredoka-600.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 400; font-display: swap; src: url(../fonts/montserrat-400.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 600; font-display: swap; src: url(../fonts/montserrat-600.woff2) format("woff2"); }
+:root {
+  --paper: #FAF8F4; --surface: #FFFFFF; --ink: #161A17; --muted: #5F665F; --line: #E6E1D8;
+  --green: #17803A; --lens: #25B34C; --red: #C8102E; --focus: #1D6FD8; --warn-bg: #FFF1D6; --warn: #7A4A00;
+  --display: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+  --body: "Montserrat", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); -webkit-text-size-adjust: 100%; }
+button, input, select { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; margin: 0; text-wrap: balance; }
+.wrap { max-width: 1060px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+.top img { display: block; height: 34px; width: auto; }
+.top .phone { font-size: .85rem; color: var(--muted); }
+.top .phone a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.crumbs { border-bottom: 1px solid var(--line); font-size: .9rem; }
+.crumbs a { display: inline-block; padding: 10px 0; color: var(--ink); text-decoration: none; font-weight: 600; }
+.proto { background: var(--warn-bg); color: var(--warn); font-size: .88rem; padding: 10px 0; border-bottom: 1px solid #F0D9A8; }
+.head { padding: 24px 0 8px; }
+.head h1 { font-size: clamp(1.9rem, 6.5vw, 2.7rem); margin-bottom: 8px; }
+.head p { color: var(--muted); max-width: 44rem; margin: 0; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 16px 0 40px; }
+.layout > * { min-width: 0; }
+@media (min-width: 900px) { .layout { grid-template-columns: 1fr 420px; align-items: start; } .preview-col { position: sticky; top: 16px; } }
+/* On phones the preview sits right under the photos, where the photo is moved and zoomed. */
+@media (max-width: 899px) { .layout { gap: 0; } .layout > div:first-child { display: contents; } #p-size { order: 1; } #p-photos { order: 2; } .preview-col { order: 3; margin-bottom: 14px; } #p-dates { order: 4; } #p-order { order: 5; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 14px; }
+.panel h2 { font-size: 1.3rem; margin-bottom: 6px; }
+.step { color: var(--green); font-weight: 600; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+.sub { color: var(--muted); font-size: .92rem; margin: 0 0 12px; }
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.choices button { text-align: left; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 10px 12px; cursor: pointer; color: var(--ink); }
+.choices button b { display: block; }
+.choices button span { color: var(--muted); font-size: .85rem; }
+.choices button[aria-pressed="true"] { border-color: var(--green); background: #F1F8F3; }
+.field { display: grid; gap: 5px; margin-top: 12px; }
+.field label { font-weight: 600; font-size: .92rem; }
+.field select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+.field input, .field select { min-height: 46px; padding: 9px 12px; border: 1.5px solid #CFC8BB; border-radius: 12px; background: #fff; }
+.field .flabel { font-weight: 600; font-size: .92rem; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px 6px 6px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: 600 .88rem var(--body); cursor: pointer; }
+.sw[aria-pressed="true"], .sw.on { border-color: var(--green); box-shadow: 0 0 0 2px var(--green) inset; }
+.sw .chip { width: 28px; height: 28px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); flex: none; }
+.sw.custom input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.sw.custom:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.contrast { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); font-size: .9rem; font-weight: 600; }
+.drop { position: relative; display: grid; place-items: center; gap: 4px; text-align: center; border: 2px dashed #CFC8BB; border-radius: 14px; padding: 18px; background: var(--paper); }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.note { font-size: .86rem; color: var(--muted); }
+.pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; margin-top: 14px; }
+.pages button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 4px; cursor: pointer; display: grid; gap: 3px; justify-items: center; font-size: .72rem; font-weight: 600; color: var(--ink); position: relative; }
+.pages button[aria-pressed="true"] { border-color: var(--green); box-shadow: 0 0 0 2px var(--green) inset; }
+.pages canvas { width: 100%; aspect-ratio: 210 / 297; display: block; border-radius: 4px; background: #F3F0EA; }
+.pages .warn { position: absolute; top: 2px; right: 4px; color: var(--warn); font-size: .9rem; }
+.edit-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+.edit-row input[type=range] { flex: 1 1 160px; accent-color: var(--green); }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 10px 20px; border-radius: 999px; border: 0; background: var(--green); color: #fff; font-weight: 600; cursor: pointer; text-decoration: none; position: relative; }
+.btn.ghost { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dates { display: grid; gap: 8px; margin-top: 10px; }
+.dates .row { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 1fr) auto; gap: 8px; }
+.dates input { min-height: 44px; padding: 8px 10px; border: 1.5px solid #CFC8BB; border-radius: 10px; min-width: 0; }
+.dates .rm { border: 0; background: none; color: var(--red); font-weight: 600; cursor: pointer; }
+.stage { background: #E9E5DD; border-radius: 18px; padding: 16px; display: grid; place-items: center; }
+#preview { width: 100%; max-width: 360px; aspect-ratio: 210 / 297; background: #fff; box-shadow: 0 10px 24px rgba(22,26,23,.18); touch-action: none; cursor: grab; display: block; }
+.quality { display: inline-block; margin-top: 10px; padding: 5px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+.quality.good { background: #E6F4EA; color: #0F5A27; }
+.quality.ok { background: #EEF2F8; color: #24406A; }
+.quality.low { background: var(--warn-bg); color: var(--warn); }
+.caption { text-align: center; font-size: .9rem; color: var(--muted); margin: 8px 0 0; }
+.status { padding: 12px 14px; border-radius: 12px; font-weight: 600; background: #EEF2F8; color: #24406A; margin-top: 12px; }
+.status.err { background: #FDECEC; color: #8A1020; }
+.product { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1.5px solid var(--green); background: #F1F8F3; border-radius: 12px; padding: 10px 14px; }
+.product b { display: block; }
+.product span { color: var(--muted); font-size: .85rem; }
+.product strong { font-family: var(--display); font-weight: 600; font-size: 1.6rem; color: var(--green); }
+.pay { border: 0; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.pay legend { font-weight: 600; font-size: .92rem; margin-bottom: 6px; padding: 0; }
+.pay label { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; border: 1.5px solid #CFC8BB; border-radius: 12px; padding: 12px 13px; cursor: pointer; background: #fff; }
+.pay label:has(input:checked) { border-color: var(--green); box-shadow: 0 0 0 2px rgba(23,128,58,.15); }
+.pay input, .check input { accent-color: var(--green); width: 18px; height: 18px; margin: 2px 0 0; }
+.pay span { display: grid; gap: 2px; }
+.pay small { color: var(--muted); font-size: .85rem; line-height: 1.35; }
+.check { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; margin: 16px 0 4px; font-size: .92rem; cursor: pointer; }
+.total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 14px; }
+#send { width: 100%; margin-top: 14px; }
+.done { text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px 18px; display: grid; gap: 12px; justify-items: center; margin: 16px 0 40px; }
+.done h2 { font-size: 1.5rem; }
+.done .ordno { font-family: var(--display); font-weight: 600; font-size: 2.6rem; color: var(--green); letter-spacing: .03em; font-variant-numeric: tabular-nums; }
+.done p { margin: 0; max-width: 46ch; }
+.done .btn { min-width: 220px; }
+.paynote { background: #FFF1E6; border: 1px solid #F3C9A6; color: #7A3A0A; border-radius: 10px; padding: 10px 12px; font-size: .92rem; text-align: left; }
+.linkish { background: none; border: 0; padding: 0; color: var(--green); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="../"><img src="../img/pd-logo.svg" alt="Perfect Digital" width="129" height="34"></a>
+  <div class="phone">Questions? <a href="tel:02085529419">020 8552 9419</a></div>
+</div></header>
+<nav class="crumbs"><div class="wrap"><a href="../">&lsaquo; Order online</a></div></nav>
+<div class="proto" id="testnote" hidden><div class="wrap">Test version: nothing is sent to the shop from here. &ldquo;Send my order&rdquo; makes the print file so you can test print it on the CX.</div></div>
+
+<main class="wrap">
+  <section class="head">
+    <h1>Photo calendars</h1>
+    <p>Your photos for each month, your family&rsquo;s birthdays on the right days, and the bank holidays already marked. Printed in our East Ham shop.</p>
+      <p class="xmas-note" hidden></p>
+  </section>
+
+  <div class="layout" id="maker">
+    <div>
+      <section class="panel" id="p-size" aria-labelledby="size-title">
+        <p class="step">Step 1</p>
+        <h2 id="size-title">Your calendar</h2>
+        <div class="product"><div><b>A4 wall calendar</b><span>21 &times; 29.7cm, a photo and a page for each month, bound at the top</span></div><strong>&pound;20</strong></div>
+        <div class="field"><label for="start">Starts in</label>
+          <select id="start"><option value="2027-01">January 2027 (to December 2027)</option><option value="2026-12">December 2026 (to November 2027)</option></select></div>
+        <div class="field"><label for="title">Words for the front <span class="note">(optional)</span></label>
+          <input id="title" maxlength="30" placeholder="For example: The Khan family"></div>
+        <div class="field"><span class="flabel" id="bg-label">Background colour</span>
+          <div class="swatches" id="bg-swatches" role="group" aria-labelledby="bg-label"></div></div>
+        <div class="field"><span class="flabel" id="ink-label">Text colour</span>
+          <div class="swatches" id="ink-swatches" role="group" aria-labelledby="ink-label"></div></div>
+        <p class="contrast" id="contrast" role="status" hidden></p>
+      </section>
+
+      <section class="panel" id="p-photos" aria-labelledby="photo-title">
+        <p class="step">Step 2</p>
+        <h2 id="photo-title">Add your photos</h2>
+        <p class="sub">Add up to 13: one for the front and one for each month. Tap a page to change its photo, then drag the photo to move it.</p>
+        <div class="drop" id="drop">
+          <input type="file" id="files" accept="image/*" multiple aria-label="Choose photos">
+          <span><b>Choose photos</b> or drop them here</span>
+          <span class="note">JPG or PNG from your phone or camera</span>
+        </div>
+        <div class="pages" id="pages" role="group" aria-label="Pages"></div>
+        <div class="edit-row" id="edit-row" hidden>
+          <span class="note" id="page-name"></span>
+          <input type="range" id="zoom" min="1" max="3" step="0.01" value="1" aria-label="Zoom">
+          <span class="btn ghost">Change photo<input type="file" id="one" accept="image/*" aria-label="Change this page's photo"></span>
+        </div>
+      </section>
+
+      <section class="panel" id="p-dates" aria-labelledby="dates-title">
+        <p class="step">Step 3 (optional)</p>
+        <h2 id="dates-title">Your important dates</h2>
+        <p class="sub">Birthdays and anniversaries go on the right day of the calendar.</p>
+        <div class="dates" id="dates"></div>
+        <button class="btn ghost" type="button" id="add-date" style="margin-top: 10px">Add a date</button>
+      </section>
+
+      <section class="panel" id="p-order" aria-labelledby="order-title">
+        <p class="step">Step 4</p>
+        <h2 id="order-title">Order your calendar</h2>
+        <p class="sub">Printed and bound in our East Ham shop, ready the next working day.</p>
+          <p class="xmas-note" hidden></p>
+        <div class="field"><label for="qty">How many?</label><select id="qty"></select></div>
+        <div class="total"><span>Total</span><span id="total">&pound;20</span></div>
+        <div class="field"><label for="cust-name">Your name</label><input type="text" id="cust-name" autocomplete="name" maxlength="60"></div>
+        <div class="field"><label for="cust-phone">Mobile number</label><input type="tel" id="cust-phone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="07">
+          <span class="note">So we can ring you if there&rsquo;s a problem with a photo.</span></div>
+        <label class="offers" style="display:flex;gap:10px;align-items:flex-start;margin:2px 0 14px;cursor:pointer;font-size:0.92rem"><input type="checkbox" id="cust-offers" style="width:20px;height:20px;flex:none;margin-top:1px"><span>Send me occasional offers from Perfect Digital. You can stop them at any time.</span></label>
+        <fieldset class="pay" id="pay-choice">
+          <legend>How would you like to pay?</legend>
+          <label id="pay-online-opt" hidden><input type="radio" name="pay" value="online"><span><b>Pay now</b><small>Card, Apple Pay or Google Pay, on Stripe&rsquo;s secure payment page.</small></span></label>
+          <label><input type="radio" name="pay" value="shop"><span><b>Pay in the shop</b><small>We&rsquo;ll only print your calendar after you&rsquo;ve paid at the counter. It&rsquo;s then ready the next working day.</small></span></label>
+        </fieldset>
+        <label class="check"><input type="checkbox" id="checked"> <span>I&rsquo;ve checked every page: the photos, the words and the dates.</span></label>
+        <p class="note">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details to make your calendar, and we delete them 30 days after your order.</p>
+        <button class="btn" type="button" id="send">Send my order</button>
+        <div class="status" id="status" role="status" hidden></div>
+      </section>
+    </div>
+
+    <div class="preview-col">
+      <div class="stage"><canvas id="preview" width="420" height="594" aria-label="Preview of the selected page"></canvas></div>
+      <p class="caption" id="caption"></p>
+      <p style="text-align:center; margin: 0"><span class="quality" id="quality" hidden></span></p>
+    </div>
+  </div>
+  <section class="done" id="done" hidden aria-live="polite"></section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // England and Wales bank holidays (GOV.UK), for the months the calendar can show.
+  const BANK = { '2026-12-25': 'Christmas Day', '2026-12-28': 'Boxing Day', '2027-01-01': 'New Year’s Day', '2027-03-26': 'Good Friday',
+    '2027-03-29': 'Easter Monday', '2027-05-03': 'Bank holiday', '2027-05-31': 'Bank holiday', '2027-08-30': 'Bank holiday',
+    '2027-12-27': 'Christmas Day', '2027-12-28': 'Boxing Day' };
+  // A4 only (the shop prints calendars on the CX). Size in mm; 300 dpi stays under phones' canvas limits.
+  const SIZES = { A4: { w: 210, h: 297, dpi: 300 } };
+  const state = { size: 'A4', start: '2027-01', title: '', pages: Array.from({ length: 13 }, () => ({ img: null, zoom: 1, x: 0.5, y: 0.5 })), sel: 0, dates: [], bg: '#FFFFFF', ink: '#161A17' };
+
+  // ---------- Layout (in units of page width, so A4 and A3 share it) ----------
+  function months() {
+    const [y, m] = state.start.split('-').map(Number);
+    return Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.UTC(y, m - 1 + i, 1)); return { y: d.getUTCFullYear(), m: d.getUTCMonth() }; });
+  }
+  function pageName(i) { if (i === 0) return 'Front'; const t = months()[i - 1]; return MONTHS[t.m].slice(0, 3) + ' ' + String(t.y).slice(2); }
+  // Everything is laid out in "A4 millimetres" scaled to the page width, so an A3 page is an A4 page made bigger.
+  function photoBox(i, W, H) {
+    const mm = W / 210;
+    const top = 16 * mm, side = 10 * mm;
+    return i === 0 ? { x: side, y: top, w: W - 2 * side, h: H - top - 52 * mm } : { x: side, y: top, w: W - 2 * side, h: (W - 2 * side) * 0.69 };
+  }
+
+  // ---------- Colours: the customer picks the background and the text; the rest follows ----------
+  const BACKGROUNDS = [['White', '#FFFFFF'], ['Cream', '#FBF5E9'], ['Blush pink', '#FBE7E4'], ['Sage green', '#E5EFE3'], ['Sky blue', '#E2EDF8'],
+    ['Lavender', '#ECE6F5'], ['Navy', '#1C2A44'], ['Forest green', '#1E3B2F'], ['Charcoal', '#2A2D2B']];
+  const INKS = [['Charcoal', '#161A17'], ['Navy', '#1C2A44'], ['Green', '#17803A'], ['Burgundy', '#8A1C2B'], ['Plum', '#5B2A6E'],
+    ['Brown', '#5A3A22'], ['White', '#FFFFFF'], ['Gold', '#E2B65A']];
+  const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = c => '#' + c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  const lum = h => { const [r, g, b] = hex2rgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const mix = (a, b, t) => { const p = hex2rgb(a), q = hex2rgb(b); return rgb2hex(p.map((v, i) => v + (q[i] - v) * t)); };   // t = share of b
+  const sat = h => { const c = hex2rgb(h).map(v => v / 255), mx = Math.max(...c), mn = Math.min(...c), l = (mx + mn) / 2; return mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1)); };
+  function theme() {
+    const bg = state.bg, ink = state.ink;
+    // White with charcoal is the original design: keep its exact colours.
+    if (bg === '#FFFFFF' && ink === '#161A17') return { bg, ink, muted: '#5F665F', accent: '#17803A', mine: '#C8102E', tint: '#EEF6F0', line: '#D9D3C7', empty: '#EFEBE3', emptyText: '#9A958B' };
+    const firstOk = (list, min) => list.find(c => contrast(c, bg) >= min);
+    let muted = mix(ink, bg, 0.3); if (contrast(muted, bg) < 4.5) muted = ink;
+    // Weekends and bank holidays: the shop green, or the text colour when that is a colour of its own,
+    // or a lighter green when the green would not show up on a dark background.
+    const accent = sat(ink) > 0.35 && contrast(ink, bg) >= 3 ? ink : (firstOk(['#17803A', '#7ED69A', '#B7EBC6'], 3) || ink);
+    const mine = firstOk(['#C8102E', '#FF8C9E', '#FFC2CC'], 3) || ink;   // the customer's own dates
+    return { bg, ink, muted, accent, mine, tint: mix(bg, accent, 0.1), line: mix(bg, ink, 0.22), empty: mix(bg, ink, 0.07), emptyText: mix(bg, ink, 0.45) };
+  }
+
+  // ---------- Drawing ----------
+  function drawPhoto(g, p, box, th) {
+    g.save(); g.beginPath(); g.rect(box.x, box.y, box.w, box.h); g.clip();
+    if (p.img) {
+      const s = Math.max(box.w / p.img.naturalWidth, box.h / p.img.naturalHeight) * p.zoom;
+      const iw = p.img.naturalWidth * s, ih = p.img.naturalHeight * s;
+      const left = Math.min(box.x, Math.max(box.x + box.w - iw, box.x + box.w / 2 - p.x * iw));
+      const top = Math.min(box.y, Math.max(box.y + box.h - ih, box.y + box.h / 2 - p.y * ih));
+      p.x = (box.x + box.w / 2 - left) / iw; p.y = (box.y + box.h / 2 - top) / ih;
+      g.drawImage(p.img, left, top, iw, ih);
+      p.crop = { w: box.w / iw * p.img.naturalWidth };
+    } else {
+      g.fillStyle = th.empty; g.fillRect(box.x, box.y, box.w, box.h);
+      g.fillStyle = th.emptyText; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '600 ' + Math.round(box.w * 0.045) + 'px Montserrat, sans-serif';
+      g.fillText('Add a photo', box.x + box.w / 2, box.y + box.h / 2);
+    }
+    g.restore();
+  }
+  function fit(g, text, maxW, size, weight, family) {
+    let s = size; do { g.font = weight + ' ' + Math.round(s) + 'px ' + family; s *= 0.94; } while (g.measureText(text).width > maxW && s > 6);
+  }
+  function drawPage(g, i, W, H) {
+    const mm = W / 210, th = theme();
+    g.fillStyle = th.bg; g.fillRect(0, 0, W, H);
+    const box = photoBox(i, W, H);
+    drawPhoto(g, state.pages[i], box, th);
+    g.fillStyle = th.ink; g.textBaseline = 'alphabetic';
+    if (i === 0) {
+      const ms = months(), first = ms[0], last = ms[11];
+      const years = first.y === last.y ? String(first.y) : MONTHS[first.m].slice(0, 3) + ' ' + first.y + ' – ' + MONTHS[last.m].slice(0, 3) + ' ' + last.y;
+      g.textAlign = 'center';
+      const by = box.y + box.h;
+      fit(g, years, W - 20 * mm, 18 * mm, '600', 'Fredoka, sans-serif');
+      g.fillText(years, W / 2, by + 20 * mm);
+      if (state.title) { fit(g, state.title, W - 20 * mm, 8 * mm, '400', 'Montserrat, sans-serif'); g.fillStyle = th.muted; g.fillText(state.title, W / 2, by + 32 * mm); }
+      return;
+    }
+    const t = months()[i - 1];
+    const gx = 10 * mm, gw = W - 20 * mm, titleY = box.y + box.h + 13 * mm;
+    g.textAlign = 'left';
+    g.font = '600 ' + Math.round(10 * mm) + 'px Fredoka, sans-serif';
+    g.fillText(MONTHS[t.m], gx, titleY);
+    const mw = g.measureText(MONTHS[t.m] + ' ').width;
+    g.fillText(String(t.y), gx + mw, titleY);   // the year in the text colour, like the month (Arshan, 10 Nov)
+    // Grid
+    const gy = titleY + 6 * mm, gh = H - gy - 10 * mm, head = 6 * mm;
+    const first = (new Date(Date.UTC(t.y, t.m, 1)).getUTCDay() + 6) % 7;   // Monday = 0
+    const days = new Date(Date.UTC(t.y, t.m + 1, 0)).getUTCDate();
+    const rows = Math.ceil((first + days) / 7), cw = gw / 7, rh = (gh - head) / rows;
+    g.fillStyle = th.muted; g.textAlign = 'center';
+    g.font = '600 ' + Math.round(3.2 * mm) + 'px Montserrat, sans-serif';
+    DAYS.forEach((d, k) => g.fillText(d, gx + cw * k + cw / 2, gy + head * 0.7));
+    const mine = {};
+    state.dates.forEach(d => { if (d.date && d.label) { const k = d.date.slice(5); (mine[k] = mine[k] || []).push(d.label); } });
+    for (let d = 1; d <= days; d++) {
+      const pos = first + d - 1, c = pos % 7, r = Math.floor(pos / 7);
+      const x = gx + c * cw, y = gy + head + r * rh;
+      const key = t.y + '-' + String(t.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      if (BANK[key]) { g.fillStyle = th.tint; g.fillRect(x, y, cw, rh); }
+      g.fillStyle = c >= 5 || BANK[key] ? th.accent : th.ink;
+      g.textAlign = 'left';
+      g.font = '600 ' + Math.round(3.6 * mm) + 'px Montserrat, sans-serif';
+      g.fillText(String(d), x + 1.6 * mm, y + 4.6 * mm);
+      const notes = [];
+      if (BANK[key]) notes.push({ t: BANK[key], c: th.accent });
+      (mine[key.slice(5)] || []).forEach(l => notes.push({ t: l, c: th.mine }));
+      g.font = '400 ' + Math.round(2.3 * mm) + 'px Montserrat, sans-serif';
+      notes.slice(0, 3).forEach((n, k) => {
+        g.fillStyle = n.c; let s = n.t;
+        while (g.measureText(s).width > cw - 2.4 * mm && s.length > 3) s = s.slice(0, -2) + '…';
+        g.fillText(s, x + 1.2 * mm, y + rh - 1.6 * mm - (notes.slice(0, 3).length - 1 - k) * 2.9 * mm);
+      });
+    }
+    // Lines
+    g.strokeStyle = th.line; g.lineWidth = Math.max(1, 0.25 * mm);
+    for (let r = 0; r <= rows; r++) { g.beginPath(); g.moveTo(gx, gy + head + r * rh); g.lineTo(gx + gw, gy + head + r * rh); g.stroke(); }
+    for (let c = 0; c <= 7; c++) { g.beginPath(); g.moveTo(gx + c * cw, gy + head); g.lineTo(gx + c * cw, gy + head + rows * rh); g.stroke(); }
+  }
+
+  // ---------- Preview, pages strip and photo quality ----------
+  const pv = $('preview');
+  function renderPreview() {
+    const S = SIZES[state.size], dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.round(360 * dpr), H = Math.round(W * S.h / S.w);
+    if (pv.width !== W || pv.height !== H) { pv.width = W; pv.height = H; }
+    drawPage(pv.getContext('2d'), state.sel, W, H);
+    $('caption').textContent = (state.sel === 0 ? 'Front cover' : MONTHS[months()[state.sel - 1].m] + ' ' + months()[state.sel - 1].y) + ', ' + state.size;
+    quality();
+  }
+  function ppi(i) {
+    const p = state.pages[i]; if (!p.img || !p.crop) return null;
+    const S = SIZES[state.size], box = photoBox(i, S.w, S.h);   // in mm
+    return p.crop.w / (box.w / 25.4);
+  }
+  function quality() {
+    const q = $('quality'), v = ppi(state.sel);
+    q.hidden = v === null; if (v === null) return;
+    if (v >= 150) { q.className = 'quality good'; q.textContent = 'Photo quality: good'; }
+    else if (v >= 100) { q.className = 'quality ok'; q.textContent = 'Photo quality: fine at this size'; }
+    else { q.className = 'quality low'; q.textContent = 'This photo may look blurry. Try zooming out or a bigger photo.'; }
+  }
+  function renderPages() {
+    const box = $('pages'); box.textContent = '';
+    state.pages.forEach((p, i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(i === state.sel));
+      const c = document.createElement('canvas'); c.width = 84; c.height = Math.round(84 * SIZES[state.size].h / SIZES[state.size].w);
+      drawPage(c.getContext('2d'), i, c.width, c.height);
+      const v = ppi(i);
+      b.append(c, document.createTextNode(pageName(i)));
+      if (v !== null && v < 100) { const w = document.createElement('span'); w.className = 'warn'; w.textContent = '!'; w.title = 'Photo may look blurry'; b.appendChild(w); }
+      b.addEventListener('click', () => { state.sel = i; renderPages(); renderPreview(); syncEdit(); });
+      box.appendChild(b);
+    });
+  }
+  function syncEdit() {
+    const p = state.pages[state.sel];
+    $('edit-row').hidden = !state.pages.some(x => x.img);
+    $('page-name').textContent = state.sel === 0 ? 'Front cover' : MONTHS[months()[state.sel - 1].m];
+    $('zoom').value = p.zoom; $('zoom').disabled = !p.img;
+  }
+  function renderAll() { renderPages(); renderPreview(); syncEdit(); if ($('status').classList.contains('err')) $('status').hidden = true; }
+
+  // ---------- Photos ----------
+  function loadImg(file) {
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('That photo could not be opened.')); im.src = URL.createObjectURL(file); });
+  }
+  async function addFiles(files, at) {
+    const list = Array.from(files).filter(f => /^image\//.test(f.type)).slice(0, 13);
+    for (const f of list) {
+      let i = at !== undefined ? at : state.pages.findIndex(p => !p.img);
+      if (i < 0) break;
+      try { state.pages[i] = { img: await loadImg(f), zoom: 1, x: 0.5, y: 0.5 }; } catch (e) { /* skip unreadable files */ }
+      if (at !== undefined) break;
+    }
+    renderAll();
+  }
+  $('files').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+  $('one').addEventListener('change', e => { addFiles(e.target.files, state.sel); e.target.value = ''; });
+  $('zoom').addEventListener('input', e => { state.pages[state.sel].zoom = Number(e.target.value); renderPreview(); });
+  $('zoom').addEventListener('change', renderPages);
+  let drag = null;
+  pv.addEventListener('pointerdown', e => {
+    const p = state.pages[state.sel]; if (!p.img) return;
+    pv.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, sx: p.x, sy: p.y };
+  });
+  pv.addEventListener('pointermove', e => {
+    if (!drag) return; const p = state.pages[state.sel];
+    const r = pv.getBoundingClientRect(), scale = pv.width / r.width, box = photoBox(state.sel, pv.width, pv.height);
+    const s = Math.max(box.w / p.img.naturalWidth, box.h / p.img.naturalHeight) * p.zoom;
+    p.x = drag.sx - (e.clientX - drag.x) * scale / (p.img.naturalWidth * s);
+    p.y = drag.sy - (e.clientY - drag.y) * scale / (p.img.naturalHeight * s);
+    renderPreview();
+  });
+  ['pointerup', 'pointercancel'].forEach(t => pv.addEventListener(t, () => { if (drag) { drag = null; renderPages(); } }));
+
+  // ---------- Options and dates ----------
+  function checkContrast() {
+    // 4:1 or better reads well in print at these sizes (the dates are bold); below that, say so.
+    const note = $('contrast'), c = contrast(state.ink, state.bg);
+    note.hidden = c >= 4;
+    if (c < 4) note.textContent = 'This text colour will be hard to read on this background. Try a ' + (lum(state.bg) < 0.2 ? 'lighter' : 'darker') + ' text colour.';
+  }
+  function renderSwatches() {
+    [['bg-swatches', BACKGROUNDS, 'bg', 'background'], ['ink-swatches', INKS, 'ink', 'text']].forEach(([id, list, key, what]) => {
+      const box = $(id); box.textContent = '';
+      const known = list.some(([, c]) => c === state[key]);
+      list.forEach(([name, c]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.setAttribute('aria-pressed', String(state[key] === c));
+        const chip = document.createElement('span'); chip.className = 'chip'; chip.style.background = c;
+        b.append(chip, document.createTextNode(name));
+        b.addEventListener('click', () => { state[key] = c; renderSwatches(); renderAll(); });
+        box.appendChild(b);
+      });
+      // Any other colour, with the phone's own colour picker.
+      const other = document.createElement('label'); other.className = 'sw custom' + (known ? '' : ' on');
+      const chip = document.createElement('span'); chip.className = 'chip';
+      chip.style.background = known ? 'conic-gradient(#C8102E, #E2B65A, #17803A, #1D6FD8, #5B2A6E, #C8102E)' : state[key];
+      const inp = document.createElement('input'); inp.type = 'color'; inp.value = state[key].toLowerCase(); inp.setAttribute('aria-label', 'Choose any ' + what + ' colour');
+      inp.addEventListener('input', () => { state[key] = inp.value.toUpperCase(); chip.style.background = state[key]; checkContrast(); renderPreview(); });
+      inp.addEventListener('change', () => { state[key] = inp.value.toUpperCase(); renderSwatches(); renderAll(); });
+      other.append(chip, document.createTextNode('Other'), inp);
+      box.appendChild(other);
+    });
+    checkContrast();
+  }
+  $('start').addEventListener('change', e => { state.start = e.target.value; renderAll(); renderDates(); });
+  $('title').addEventListener('input', e => { state.title = e.target.value.trim(); if (state.sel === 0) renderPreview(); renderPages(); });
+  function renderDates() {
+    const box = $('dates'); box.textContent = '';
+    const ms = months(), min = ms[0].y + '-' + String(ms[0].m + 1).padStart(2, '0') + '-01';
+    const end = new Date(Date.UTC(ms[11].y, ms[11].m + 1, 0)), max = end.toISOString().slice(0, 10);
+    state.dates.forEach((d, i) => {
+      const row = document.createElement('div'); row.className = 'row';
+      const di = document.createElement('input'); di.type = 'date'; di.min = min; di.max = max; di.value = d.date; di.setAttribute('aria-label', 'Date');
+      const li = document.createElement('input'); li.maxLength = 24; li.placeholder = 'Mum’s birthday'; li.value = d.label; li.setAttribute('aria-label', 'What it is');
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm'; rm.textContent = 'Remove';
+      di.addEventListener('change', () => { d.date = di.value; renderAll(); });
+      li.addEventListener('input', () => { d.label = li.value.trim(); renderPreview(); });
+      li.addEventListener('change', renderPages);
+      rm.addEventListener('click', () => { state.dates.splice(i, 1); renderDates(); renderAll(); });
+      row.append(di, li, rm); box.appendChild(row);
+    });
+    $('add-date').hidden = state.dates.length >= 20;
+  }
+  $('add-date').addEventListener('click', () => { state.dates.push({ date: '', label: '' }); renderDates(); });
+
+  // ---------- Print file: one full-page JPEG per page, in a PDF the size of the paper ----------
+  function toJpeg(c) { return new Promise((res, rej) => c.toBlob(b => b ? b.arrayBuffer().then(x => res(new Uint8Array(x)), rej) : rej(new Error('The page could not be made.')), 'image/jpeg', 0.88)); }   // 0.88: no visible difference in print, a fifth smaller to send
+  function buildPdf(pages, wPt, hPt, title) {
+    const enc = new TextEncoder(), parts = [], xref = []; let off = 0;
+    const add = d => { const u = typeof d === 'string' ? enc.encode(d) : d; parts.push(u); off += u.length; };
+    const n = pages.length, pg = i => 3 + i * 3, im = i => 4 + i * 3, co = i => 5 + i * 3, info = 3 + n * 3;
+    add('%PDF-1.7\n%âãÏÓ\n');
+    xref[1] = off; add('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    xref[2] = off; add('2 0 obj\n<< /Type /Pages /Kids [' + pages.map((_, i) => pg(i) + ' 0 R').join(' ') + '] /Count ' + n + ' >>\nendobj\n');
+    pages.forEach((p, i) => {
+      xref[pg(i)] = off; add(pg(i) + ' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wPt + ' ' + hPt + '] /Resources << /XObject << /Im' + i + ' ' + im(i) + ' 0 R >> >> /Contents ' + co(i) + ' 0 R >>\nendobj\n');
+      xref[im(i)] = off; add(im(i) + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + p.jpeg.length + ' >>\nstream\n');
+      add(p.jpeg); add('\nendstream\nendobj\n');
+      const content = 'q ' + wPt + ' 0 0 ' + hPt + ' 0 0 cm /Im' + i + ' Do Q';
+      xref[co(i)] = off; add(co(i) + ' 0 obj\n<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream\nendobj\n');
+    });
+    xref[info] = off; add(info + ' 0 obj\n<< /Title (' + String(title).replace(/[^\x20-\x7E]/g, '').replace(/([\\()])/g, '\\$1') + ') /Creator (Perfect Digital calendar maker) >>\nendobj\n');
+    const at = off; let x = 'xref\n0 ' + (info + 1) + '\n0000000000 65535 f \n';
+    for (let i = 1; i <= info; i++) x += String(xref[i]).padStart(10, '0') + ' 00000 n \n';
+    add(x); add('trailer\n<< /Size ' + (info + 1) + ' /Root 1 0 R /Info ' + info + ' 0 R >>\nstartxref\n' + at + '\n%%EOF\n');
+    const out = new Uint8Array(off); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out;
+  }
+  async function makePdf(onPage) {
+    const S = SIZES[state.size], W = Math.round(S.w / 25.4 * S.dpi), H = Math.round(S.h / 25.4 * S.dpi);
+    const pages = [];
+    for (let i = 0; i < 13; i++) {
+      onPage && onPage(i);
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      drawPage(c.getContext('2d'), i, W, H);
+      pages.push({ jpeg: await toJpeg(c), w: W, h: H });
+      c.width = c.height = 1;
+      await new Promise(r => setTimeout(r, 0));
+    }
+    return buildPdf(pages, (S.w / 25.4 * 72).toFixed(2), (S.h / 25.4 * 72).toFixed(2), 'Calendar ' + state.size);
+  }
+  window.PD_CALENDAR = { makePdf, state };
+
+  // ---------- Ordering ----------
+  // On order.perfect.digital (or GitHub's address for it) the order goes to the shop's card and calendar
+  // orders script, like the card maker's. Anywhere else (the claude.ai preview, a test copy) nothing is
+  // sent: the print file is offered to save instead, so it can be test printed.
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxGbrp5kGw9jlJccINtgT7IX4fRJ9HvtkeLAhtswEQjBRUC0Ws8Noar5PGKgs7Hc7ix/exec';
+  const RETURN_URL = 'https://order.perfect.digital/calendar/';   // where Stripe sends customers back to
+  const PRICE = 20, MAX_QTY = 10, PHONE = '020 8552 9419';
+  const TEST_MODE = !/(^|\.)perfect\.digital$|\.github\.io$/.test(location.hostname);
+  const SHOP_LINE = '<p>Perfect Digital, 211 High Street North, East Ham E6 1JG. Monday to Saturday, 10am to 7pm.</p>';
+  const money = v => '£' + (Number.isInteger(v) ? String(v) : Number(v).toFixed(2));
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const token = (() => { const a = new Uint8Array(16); crypto.getRandomValues(a); return 'k-' + Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); })();
+  let setup = null, busy = false, saver = null;
+  try { if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then(d => { saver = d; }, () => {}); } catch (e) { /* not in the preview */ }
+
+  function server(fn, arg) {
+    return fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn, arg }) })
+      .then(r => { if (!r.ok) throw new Error('The shop could not be reached (' + r.status + ').'); return r.json(); })
+      .then(j => { if (j.error) throw new Error(j.error); return j.result; });
+  }
+  // The shop's script says whether paying online is on, and whether it takes calendars yet.
+  function getSetup() {
+    if (TEST_MODE) return Promise.resolve({ online: true, calendars: true });
+    if (setup) return Promise.resolve(setup);
+    return server('getSetup').then(s => { setup = s || {}; return setup; });
+  }
+  function payChoice() { const r = document.querySelector('input[name="pay"]:checked'); return r ? r.value : ''; }
+  function setOnline(on) {
+    $('pay-online-opt').hidden = !on;
+    const online = document.querySelector('input[name="pay"][value="online"]'), shop = document.querySelector('input[name="pay"][value="shop"]');
+    if (!on && online.checked) online.checked = false;
+    if (!payChoice()) (on ? online : shop).checked = true;
+    updateTotal();
+  }
+  function qty() { return Number($('qty').value) || 1; }
+  function updateTotal() {
+    $('total').textContent = money(qty() * PRICE);
+    $('send').textContent = payChoice() === 'online' ? 'Pay ' + money(qty() * PRICE) + ' now' : 'Send my order';
+  }
+  $('qty').innerHTML = Array.from({ length: MAX_QTY }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + (i ? ' calendars' : ' calendar') + '</option>').join('');
+  $('qty').addEventListener('change', updateTotal);
+  document.querySelectorAll('input[name="pay"]').forEach(r => r.addEventListener('change', updateTotal));
+
+  function toBase64(blob) {
+    return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(new Error('The print file could not be read.')); r.readAsDataURL(blob); });
+  }
+  // A small picture of the front for the shop's email.
+  function coverJpeg() {
+    const c = document.createElement('canvas'); c.width = 600; c.height = Math.round(600 * 297 / 210);
+    drawPage(c.getContext('2d'), 0, c.width, c.height);
+    const s = c.toDataURL('image/jpeg', 0.82).split(',')[1]; c.width = c.height = 1;
+    return s;
+  }
+
+  async function send() {
+    if (busy) return;
+    const s = $('status');
+    const fail = m => { s.hidden = false; s.className = 'status err'; s.textContent = m; };
+    const empty = state.pages.filter(p => !p.img).length;
+    if (empty) { fail(empty === 13 ? 'Add your photos first.' : empty + (empty === 1 ? ' page has' : ' pages have') + ' no photo yet. Tap the grey pages to add one.'); return; }
+    const name = $('cust-name').value.replace(/\s+/g, ' ').trim(), phone = $('cust-phone').value.trim(), pay = payChoice(), n = qty();
+    if (!name) { fail('Add your name, so we know whose calendar this is.'); $('cust-name').focus(); return; }
+    if (phone.replace(/\D/g, '').length < 10) { fail('Add your mobile number (at least 10 digits).'); $('cust-phone').focus(); return; }
+    if (!pay) { fail('Choose how you would like to pay.'); return; }
+    if (!$('checked').checked) { fail('Tick the box to say you have checked every page.'); return; }
+    busy = true; $('send').disabled = true; s.hidden = false; s.className = 'status';
+    let leaving = false;
+    try {
+      s.textContent = 'Checking the shop is ready…';
+      const set = await getSetup();
+      if (!set.calendars) { fail('Sorry, we aren’t taking calendar orders online just yet. Please call us on ' + PHONE + '.'); return; }
+      if (pay === 'online' && !set.online) { setOnline(false); fail('Paying online isn’t available at the moment. Please choose to pay in the shop.'); return; }
+      const pdf = await makePdf(i => { s.textContent = 'Making page ' + (i + 1) + ' of 13…'; });
+      const blob = new Blob([pdf], { type: 'application/pdf' });
+      if (TEST_MODE) { showTest(blob, pay, n); return; }
+      const mb = (pdf.length / 1048576).toFixed(1);
+      s.textContent = 'Sending your calendar (' + mb + ' MB). This can take a minute on a phone…';
+      const res = await server('submitOrder', {
+        token, customerName: name, phone, payment: pay, offers: !!($('cust-offers') && $('cust-offers').checked), returnUrl: RETURN_URL,
+        items: [{ occasion: 'calendar', design: 'calendar-a4', start: state.start, names: state.title, qty: n, pdf: await toBase64(blob), thumb: coverJpeg() }]
+      });
+      if (res.status === 'pay') { leaving = true; s.textContent = 'Taking you to the payment page…'; location.assign(res.payUrl); return; }
+      showDone(res);
+    } catch (e) {
+      fail('We could not send your order. ' + (e.message || e) + ' If it keeps happening, call us on ' + PHONE + '.');
+    } finally {
+      busy = false; if (!leaving) $('send').disabled = false;
+    }
+  }
+  $('send').addEventListener('click', send);
+
+  // ---------- After sending ----------
+  function showOnly(html) {
+    $('maker').hidden = true;
+    const d = $('done'); d.innerHTML = html; d.hidden = false;
+    d.scrollIntoView({ block: 'start' });
+    const again = $('again'); if (again) again.addEventListener('click', () => { if (TEST_MODE) location.reload(); else location.assign(RETURN_URL); });
+  }
+  const AGAIN = '<button class="btn ghost" type="button" id="again">Make another calendar</button>';
+  function showDone(res) {
+    if (res.status === 'paid') {
+      showOnly('<h2>Thank you</h2><p>You&rsquo;ve paid ' + money(res.total) + '. Your order number is</p><div class="ordno">' + esc(res.orderNo) + '</div>' +
+        '<p>Your calendar will be ready <b>' + esc(res.readyText) + '</b>.</p>' + SHOP_LINE +
+        '<p class="note">Stripe has emailed you a receipt. We&rsquo;ll ring you on the number you gave if there&rsquo;s a problem with a photo.</p>' + AGAIN);
+    } else {
+      showOnly('<h2>Thank you</h2><p>Your order number is</p><div class="ordno">' + esc(res.orderNo) + '</div>' +
+        '<p class="paynote"><b>Pay ' + money(res.total) + ' at the counter.</b> We&rsquo;ll print your calendar once you&rsquo;ve paid, and it&rsquo;s ready the next working day.</p>' + SHOP_LINE +
+        '<p class="note">Show this number when you pay. We&rsquo;ll ring you on the number you gave if there&rsquo;s a problem with a photo.</p>' + AGAIN);
+    }
+  }
+  function showTest(blob, pay, n) {
+    showOnly('<h2>Test run complete</h2><p>In the live version this order (' + n + (n === 1 ? ' calendar, ' : ' calendars, ') + money(n * PRICE) + ') would now go to the shop' +
+      (pay === 'online' ? ', once the customer had paid on Stripe&rsquo;s page' : ', marked to be paid in the shop') + '.</p>' +
+      '<p>The print file is ready (' + (blob.size / 1048576).toFixed(1) + ' MB), so you can test print it on the CX.</p>' +
+      '<button class="btn" type="button" id="save">Save the print file</button>' + AGAIN);
+    $('save').addEventListener('click', () => {
+      const name = 'Calendar A4.pdf';
+      if (saver) { saver.save({ filename: name, data: blob }).catch(e => { if (!e || e.code !== 'declined') $('save').textContent = 'It could not be saved here'; }); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+  function showUnpaid(r, tok) {
+    showOnly('<p>Your order number is</p><div class="ordno">' + esc(r.orderNo) + '</div>' +
+      '<p>This order hasn&rsquo;t been paid for yet' + (r.total ? ' (' + money(r.total) + ')' : '') + '. We&rsquo;ll only print your calendar once it&rsquo;s paid.</p>' +
+      '<button class="btn" type="button" id="retry">Try paying again</button>' +
+      '<button class="btn ghost" type="button" id="shop-instead">Pay in the shop instead</button>' +
+      '<p class="status err" id="return-error" role="alert" hidden></p>');
+    const showErr = e => { const p = $('return-error'); p.hidden = false; p.textContent = String((e && e.message) || e); };
+    $('retry').addEventListener('click', async () => {
+      $('retry').disabled = true;
+      try {
+        const res = await server('retryPayment', { order: r.orderNo, token: tok, returnUrl: RETURN_URL });
+        if (res.status === 'pay') location.assign(res.payUrl); else showDone(res);
+      } catch (e) { showErr(e); $('retry').disabled = false; }
+    });
+    $('shop-instead').addEventListener('click', async () => {
+      $('shop-instead').disabled = true;
+      try { showDone(await server('payInShop', { order: r.orderNo, token: tok })); } catch (e) { showErr(e); $('shop-instead').disabled = false; }
+    });
+  }
+  // Back from Stripe: ?paid=<Stripe session> after paying, or ?unpaid=<order>&t=<token> after leaving without paying.
+  async function handleReturn(prm) {
+    showOnly('<p>Checking your payment…</p>');
+    try {
+      for (let i = 0; i < 5; i++) {
+        const r = await server('confirmPayment', prm.paid ? { session: prm.paid } : { order: prm.unpaid, token: prm.t });
+        if (r.status === 'paid' || r.status === 'shop') { showDone(r); return; }
+        if (r.status === 'gone') { showOnly('<p>This order has expired, so nothing was taken. Please make your calendar again.</p>' + AGAIN); return; }
+        if (prm.unpaid || r.status === 'expired') { showUnpaid(r, prm.t || ''); return; }
+        await sleep(2500);   // just paid: Stripe can take a moment to confirm
+      }
+      showOnly('<p>We&rsquo;re still waiting for Stripe to confirm your payment. If you were charged, your order is safe: we&rsquo;ll ring you. Questions? Call us on ' + PHONE + '.</p>');
+    } catch (e) {
+      showOnly('<p class="status err">' + esc((e && e.message) || e) + '</p><p>If you paid, your order is safe. Questions? Call us on ' + PHONE + '.</p>');
+    }
+  }
+
+  document.fonts.load('600 20px Fredoka').then(() => document.fonts.load('600 20px Montserrat')).then(() => document.fonts.load('400 20px Montserrat')).catch(() => {}).then(renderAll);
+  renderSwatches(); renderDates(); renderAll();
+  if (TEST_MODE) $('testnote').hidden = false;
+  const prm = TEST_MODE ? {} : Object.fromEntries(new URLSearchParams(location.search));
+  if (prm.paid || prm.unpaid) {
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* fine */ }
+    handleReturn(prm);
+  }
+  getSetup().then(s => setOnline(!!(s.calendars && s.online))).catch(() => setOnline(false));
+})();
+</script>
+<script>
+// Christmas: from November, say the last day to order a calendar for Christmas (Arshan, 12 Nov 2026: 18 December,
+// the same as card packs). After that day the note goes; calendars can still be ordered as usual.
+(function () {
+  var LAST_DAY = 18;
+  var parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date());
+  var get = function (t) { return Number((parts.find(function (x) { return x.type === t; }) || {}).value); };
+  if (get('month') < 11 || (get('month') === 12 && get('day') > LAST_DAY)) return;
+  var day = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(get('year'), 11, LAST_DAY, 12)));
+  Array.prototype.forEach.call(document.querySelectorAll('.xmas-note'), function (el) {
+    el.textContent = 'For Christmas, order by ' + day + ' ' + LAST_DAY + ' December.';
+    el.style.cssText = 'margin:6px 0 0;font-weight:700;color:#C8102E';
+    el.hidden = false;
+  });
+})();
+</script>
+</body>
+</html>

@@ -149,6 +149,7 @@ textarea { min-height: 84px; resize: vertical; }
 .qty .p { font-weight: 700; font-variant-numeric: tabular-nums; }
 .qty .r { grid-column: 2 / 4; font-size: 0.8rem; color: var(--muted); }
 
+.check.offers { margin: 2px 0 14px; cursor: pointer; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; }
 .check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--red); flex: none; }
 .small { font-size: 0.82rem; color: var(--muted); margin: 0; }
@@ -309,12 +310,13 @@ footer b { color: var(--ink); }
         <input type="tel" id="cust-phone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="07">
         <p class="hint">So we can ring you if there's a problem with your photo.</p>
       </div>
+      <label class="check offers"><input type="checkbox" id="cust-offers"><span>Send me occasional offers from Perfect Digital. You can stop them at any time.</span></label>
       <fieldset class="pay" id="pay-choice">
         <legend>How would you like to pay?</legend>
         <label id="pay-online-opt" hidden><input type="radio" name="pay" value="online"><span><b>Pay now</b><small>Card, Apple Pay or Google Pay, on Stripe's secure payment page.</small></span></label>
         <label><input type="radio" name="pay" value="shop"><span><b>Pay in the shop</b><small>We'll only make your cards after you've paid at the counter.</small></span></label>
       </fieldset>
-      <p class="small">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details to make your cards, and we delete them 30 days after your order. Card payments are handled by Stripe, which keeps its own payment records.</p>
+      <p class="small">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details to make your cards, and we delete them 30 days after your order. If you ask for offers, we keep your name and mobile for those until you tell us to stop. Card payments are handled by Stripe, which keeps its own payment records.</p>
       <p class="error" id="order-error" role="alert"></p>
       <button class="btn btn-primary btn-block" id="checkout" type="button">Send my order</button>
       <div class="progress" id="progress2" hidden><div class="bar"><i id="bar2"></i></div><span id="progress2-text">Sending your order…</span></div>
@@ -5077,7 +5079,7 @@ footer b { color: var(--ink); }
         return;
       }
       const res = await server('submitOrder', {
-        token: orderToken, customerName: name, phone, payment: pay,
+        token: orderToken, customerName: name, phone, payment: pay, offers: !!($('cust-offers') && $('cust-offers').checked),
         returnUrl: isAppsScript ? '' : pageUrl(), items: basket.map(b => b.item)
       });
       setProgress2(100, 'Sent');

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Order online | Perfect Digital, East Ham</title>
-<meta name="description" content="Print your phone photos and make personalised cards online. Made in our East Ham shop, ready for you to collect.">
+<meta name="description" content="Print your phone photos and make personalised cards, photo calendars, canvases, posters and mugs online. Made in our East Ham shop, ready for you to collect.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Order online | Perfect Digital">
-<meta property="og:description" content="Photo prints and personalised cards from your phone, made in our East Ham shop.">
+<meta property="og:description" content="Photo prints, personalised cards, photo calendars, canvases, posters and mugs from your phone, made in our East Ham shop.">
 <meta property="og:url" content="https://order.perfect.digital/">
 <meta property="og:image" content="https://order.perfect.digital/img/cards.jpg">
 <link rel="icon" href="favicon.png">
@@ -59,7 +59,7 @@ a { color: inherit; }
 .go span { display: inline-block; min-height: 46px; padding: 12px 20px; border-radius: 999px; background: var(--green); color: #fff; font-weight: 600; line-height: 22px; }
 .product.cards .go span { background: var(--red); }
 .product.gifts .go span { background: var(--blue); }
-@media (min-width: 760px) { .product.gifts { grid-column: 1 / -1; flex-direction: row; } .product.gifts img { width: 50%; flex: none; } .product.gifts .body { padding: 22px 24px; } }
+.product.calendars .go span { background: var(--ink); }
 .more { padding: 18px 0 0; }
 .more p { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; text-wrap: pretty; }
 .more a { font-weight: 600; text-decoration: none; white-space: nowrap; }
@@ -73,6 +73,8 @@ footer { margin-top: 32px; padding: 22px 0 36px; border-top: 1px solid var(--lin
 footer p { margin: 0 0 6px; }
 footer b { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .product { transition: none; } .product:hover { transform: none; } }
+  .trust { margin: 10px 0 0; font-size: 0.9rem; }
+  .trust span { color: #E8A317; }
 </style>
 </head>
 <body>
@@ -84,7 +86,8 @@ footer b { color: var(--ink); }
 <main class="wrap">
   <section class="hero">
     <h1>Order online</h1>
-    <p>Print your phone photos, make your own cards, and order canvases, posters and mugs. We make them in our East Ham shop, ready for you to collect.</p>
+    <p>Print your phone photos, make your own cards and calendars, and order canvases, posters and mugs. We make them in our East Ham shop, ready for you to collect.</p>
+    <p class="trust"><span aria-hidden="true">&#9733;</span> <b>4.9 on Google</b> from 330+ reviews &middot; Family-run in East Ham since 1990</p>
   </section>
 
   <section class="products" aria-label="What you can order">
@@ -93,7 +96,7 @@ footer b { color: var(--ink); }
       <div class="body">
         <h2>Photo prints</h2>
         <p>Send photos from your phone. 6x4 up to A4, gloss or lustre, printed while you wait or ready the next day.</p>
-        <p class="price">The more you print, the less each print costs.</p>
+        <p class="price">Pay online, or at the counter if you're in the shop. The more you print, the less each print costs.</p>
         <div class="go"><span>Print my photos &rsaquo;</span></div>
       </div>
     </a>
@@ -105,6 +108,16 @@ footer b { color: var(--ink); }
         <p class="price">&pound;5 a card. Packs of 10 for &pound;30 for Christmas, invitations, new baby and weddings.</p>
         <p class="season" id="season" hidden>Christmas packs: last orders 18 December.</p>
         <div class="go"><span>Make a card &rsaquo;</span></div>
+      </div>
+    </a>
+    <a class="product calendars" href="calendar/">
+      <img src="img/calendars.jpg" width="1200" height="720" alt="Three pages of a photo calendar: the front, January and March">
+      <div class="body">
+        <h2>Photo calendars</h2>
+        <p>An A4 wall calendar with your photo for each month, your family&rsquo;s birthdays on the right days and the bank holidays marked.</p>
+        <p class="price">&pound;20, ready the next working day.</p>
+        <p class="season" id="season-cal" hidden>For Christmas, order by Friday 18 December.</p>
+        <div class="go"><span>Make a calendar &rsaquo;</span></div>
       </div>
     </a>
     <a class="product gifts" href="products/">
@@ -125,7 +138,7 @@ footer b { color: var(--ink); }
   <section class="how" aria-labelledby="how-title">
     <h2 id="how-title">How it works</h2>
     <ol>
-      <li>Choose your photos, card design, canvas, poster or mug on your phone.</li>
+      <li>Choose your photos, card, calendar, canvas, poster or mug on your phone.</li>
       <li>Send your order to the shop. We print it here.</li>
       <li>Collect from 211 High Street North, East Ham, E6&nbsp;1JG.</li>
     </ol>
@@ -141,7 +154,7 @@ footer b { color: var(--ink); }
   // Christmas packs close on 18 December (the card maker and its script use the same day).
   (function () {
     var d = new Date(), m = d.getMonth();
-    if (m === 10 || (m === 11 && d.getDate() <= 18)) document.getElementById('season').hidden = false;
+    if (m === 10 || (m === 11 && d.getDate() <= 18)) { document.getElementById('season').hidden = false; document.getElementById('season-cal').hidden = false; }
   })();
 </script>
 </body>
