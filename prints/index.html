@@ -198,8 +198,20 @@ p { margin: 0; }
 .stepper .qty { min-width: 22px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stepper.big button { width: 44px; height: 44px; font-size: 22px; }
 .stepper.big .qty { min-width: 32px; font-size: var(--s1); }
-.addtile { aspect-ratio: 1; width: 100%; border: 2px dashed var(--line); border-radius: 10px; background: transparent; color: var(--action-text); font: 600 var(--s0)/1.3 var(--body); cursor: pointer; display: grid; place-items: center; padding: 10px; }
+.addtile { aspect-ratio: 1; width: 100%; border: 2px dashed var(--line); border-radius: 10px; background: transparent; color: var(--action-text); font: 600 var(--s0)/1.3 var(--body); cursor: pointer; display: grid; place-items: center; padding: 10px; text-align: center; align-self: start; }
+/* align-self: stretched to the row's height, the square tile grew sideways past the screen edge */
 .addtile:hover { border-color: var(--action); }
+/* sets of prints: one per size, with its own heading once an order has more than one size */
+.sets { display: grid; gap: 20px; }
+.set { display: grid; gap: 12px; min-width: 0; }
+.set + .set { border-top: 1px solid var(--line); padding-top: 18px; }
+.set-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; }
+.set-head .what { display: grid; gap: 2px; flex: 1 1 0; min-width: 8em; }
+.set-size { flex: none; display: inline-flex; align-items: center; gap: 8px; font-size: var(--s-1); font-weight: 600; color: var(--muted); }
+.set-size select { width: auto; min-width: 7.5em; min-height: 44px; font-weight: 600; }
+.another { display: grid; gap: 12px; }
+.another .chips { flex-wrap: wrap; overflow: visible; }
+.field > .linkish { justify-self: start; text-align: left; }
 .skipped { font-size: var(--s-1); color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 8px 10px; }
 
 /* docket */
@@ -307,7 +319,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     </div>
     <div class="cta">
       <label for="pick" class="btn btn-primary btn-big" id="pick-label" role="button" tabindex="0">Choose photos</label>
-      <p class="small muted">Pick as many as you like at once, up to <span id="max-photos">150</span> per order.</p>
+      <p class="small muted">Pick as many as you like at once, up to <span id="max-photos">150</span> per order. You can add more photos, in other sizes too, on the next page.</p>
     </div>
 
     <div class="panel" aria-labelledby="price-title">
@@ -331,7 +343,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       <h2>How it works</h2>
       <ol class="how">
         <li><span><b>Choose your photos</b><span class="muted">Pick them straight from your phone's gallery.</span></span></li>
-        <li><span><b>Check each print</b><span class="muted">We crop every photo to the print size. Tap a photo to move the crop, change the size or add copies.</span></span></li>
+        <li><span><b>Check each print</b><span class="muted">We crop every photo to the print size. Tap a photo to move the crop, change the size or add copies. You can mix sizes in one order.</span></span></li>
         <li><span><b>Collect and pay</b><span class="muted">We print them while you wait if you're in the shop, or have them ready for you to collect.</span></span></li>
       </ol>
     </div>
@@ -349,10 +361,11 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     </div>
 
     <div class="panel settings">
-      <div class="field">
+      <div class="field" id="size-field">
         <span class="label" id="size-label">Print size for all photos</span>
         <div class="chips" id="size-chips" role="radiogroup" aria-labelledby="size-label"></div>
         <p class="hint" id="size-hint"></p>
+        <button class="linkish" type="button" id="size-another">Want some photos in another size?</button>
       </div>
       <div class="field" id="finish-field">
         <span class="label" id="finish-label">Paper</span>
@@ -375,7 +388,19 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     </div>
     <p class="skipped" id="skipped" hidden></p>
 
-    <ul class="sheetgrid" id="grid" aria-label="Your prints"></ul>
+    <div class="sets" id="grid" role="group" aria-label="Your prints"></div>
+
+    <div class="another">
+      <button class="btn btn-ghost btn-block" type="button" id="another-btn" aria-expanded="false" aria-controls="another-pick">+ Add photos in another size</button>
+      <div class="panel" id="another-pick" hidden>
+        <div class="panel-head">
+          <h3 id="another-title">Which size are the new photos?</h3>
+          <button class="linkish" type="button" id="another-cancel">Cancel</button>
+        </div>
+        <div class="chips" id="another-chips" role="group" aria-labelledby="another-title"></div>
+        <p class="hint">Then choose the photos. You can choose photos that are already in your order, to print them in this size too.</p>
+      </div>
+    </div>
     <input type="file" id="more" class="visually-hidden" accept="image/*" multiple>
   </section>
 
@@ -475,6 +500,10 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
         <span class="label">Copies</span>
         <div class="stepper big"><button type="button" id="ed-minus" aria-label="One fewer copy">−</button><span class="qty" id="ed-qty" aria-live="polite">1</span><button type="button" id="ed-plus" aria-label="One more copy">+</button></div>
       </div>
+      <div class="field wide">
+        <label class="label" for="ed-also">Also print this photo in another size</label>
+        <select id="ed-also"></select>
+      </div>
     </div>
     <div class="ed-actions">
       <button class="btn btn-ghost" type="button" id="ed-reset">Reset crop</button>
@@ -531,7 +560,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   const pageUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
   const state = {
     photos: [], size: CONFIG.DEFAULT_SIZE, finish: FINISHES[0], mode: 'fill',
-    step: 'start', editing: null, lastZip: null, busy: false, queue: [], working: 0
+    step: 'start', editing: null, lastZip: null, busy: false, queue: [], working: 0,
+    groupOrder: [],   // the sizes in the order, in the order they were first used: one set of photos each
+    addSize: null     // the size the next photos from the "more" picker go in at
   };
   let nextId = 1;
   const $ = id => document.getElementById(id);
@@ -539,7 +570,16 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   const round2 = v => Math.round(v * 100) / 100;
   const sizeById = id => SIZES.find(s => s.id === id) || SIZES[0];
   const find = id => state.photos.find(p => p.id === id);
-  const ready = () => state.photos.filter(p => p.status === 'ready');
+  // An order can mix sizes. The photos are shown as one set per size, in the order the sizes were first used,
+  // and the same photo can be in more than one set (a 6x4 and an 8x10 of it, say).
+  function groups() {
+    const used = new Set(state.photos.map(p => p.size));
+    state.groupOrder = state.groupOrder.filter(id => used.has(id));
+    for (const p of state.photos) if (!state.groupOrder.includes(p.size)) state.groupOrder.push(p.size);
+    return state.groupOrder.map(id => ({ size: sizeById(id), photos: state.photos.filter(p => p.size === id) }));
+  }
+  const ordered = () => groups().flatMap(g => g.photos);
+  const ready = () => ordered().filter(p => p.status === 'ready');
   const idle = () => new Promise(r => setTimeout(r, 0));
 
   function money(v) { return v < 1 ? Math.round(v * 100) + 'p' : '£' + v.toFixed(2); }
@@ -685,6 +725,13 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     }
   }
   function renderSettings() {
+    // One size in the order: the size buttons change every photo, as before. Once the order has more than one size,
+    // each set has its own size menu instead, so one tap can't turn every photo into the same size.
+    const gs = groups();
+    if (gs.length === 1) state.size = gs[0].size.id;
+    $('size-field').hidden = gs.length > 1;
+    renderSetHeads();
+    if (!$('another-pick').hidden) renderAnother();
     const count = Math.max(1, printCount());
     for (const b of $('size-chips').children) {
       const s = sizeById(b.dataset.size);
@@ -711,27 +758,37 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   }
 
   /* ---------- adding photos ---------- */
-  function addFiles(list) {
+  // sizeId: the size the photos go in at (the order's size if not given). A photo already in the order at that
+  // size is skipped (copies are for more of it), but the same photo can be added again in a different size.
+  function addFiles(list, sizeId) {
     const incoming = Array.from(list || []);
     if (!incoming.length) return;
-    let dupes = 0, notPhotos = 0, over = 0;
-    const seen = new Set(state.photos.map(p => p.key));
+    const into = sizeById(sizeId || state.size);
+    const wasHere = state.step === 'check', newSet = !state.photos.some(p => p.size === into.id);
+    let dupes = 0, notPhotos = 0, over = 0, added = 0;
+    const seen = new Set(state.photos.map(p => p.key + '#' + p.size));
     for (const f of incoming) {
       if (!(f.type || '').startsWith('image/') && !/\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name || '')) { notPhotos++; continue; }
       const key = [f.name, f.size, f.lastModified].join('|');
-      if (seen.has(key)) { dupes++; continue; }
+      if (seen.has(key + '#' + into.id)) { dupes++; continue; }
       if (state.photos.length >= CONFIG.MAX_PHOTOS) { over++; continue; }
-      seen.add(key);
-      const p = { id: 'p' + nextId++, key, file: f, name: f.name || 'photo.jpg', status: 'loading', qty: 1, size: state.size, mode: null, manual: null, auto: {}, w: 0, h: 0, thumb: null, ana: null };
-      state.photos.push(p); state.queue.push(p);
+      seen.add(key + '#' + into.id);
+      const p = { id: 'p' + nextId++, key, file: f, name: f.name || 'photo.jpg', status: 'loading', qty: 1, size: into.id, mode: null, manual: null, auto: {}, w: 0, h: 0, thumb: null, ana: null };
+      state.photos.push(p); state.queue.push(p); added++;
     }
+    if (added) state.size = into.id;   // "Choose photos" on the first page adds to the size used last
     const notes = [];
-    if (dupes) notes.push(dupes === 1 ? '1 photo was already in your order.' : dupes + ' photos were already in your order.');
+    if (dupes) notes.push((dupes === 1 ? '1 photo was' : dupes + ' photos were') + ' already in your ' + into.name + ' prints. For more of a photo, use + under it.');
     if (over) notes.push(over + (over === 1 ? ' photo was' : ' photos were') + ' left out because one order can have up to ' + CONFIG.MAX_PHOTOS + ' photos. Send the rest as a second order.');
     if (notPhotos) notes.push(notPhotos + (notPhotos === 1 ? ' file was not a photo.' : ' files were not photos.'));
     $('skipped').hidden = !notes.length; $('skipped').textContent = notes.join(' ');
     if (state.step !== 'check') go('check');
     renderGrid(); updateDocket(); pump();
+    // Photos added in a new size on this page start a new set further down: show it.
+    if (wasHere && newSet && added && groups().length > 1) {
+      const sec = $('grid').querySelector('.set[data-size="' + into.id + '"]');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
   }
 
   function pump() {
@@ -837,7 +894,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
 
   function fillTile(li, p) {
     li.textContent = '';
-    const idx = state.photos.indexOf(p) + 1;
+    const idx = ordered().indexOf(p) + 1;
     const slot = document.createElement('button');
     slot.type = 'button'; slot.className = 'slot'; slot.dataset.act = 'edit';
     const pr = document.createElement('span');
@@ -879,7 +936,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       meta.append(sp, rm);
     } else {
       const sz = document.createElement('span');
-      sz.className = 'tile-size' + (p.size !== state.size ? ' own' : '');
+      sz.className = 'tile-size';
       sz.textContent = sizeById(p.size).name + (modeOf(p) === 'fit' ? ' · whole' : '');
       const st = document.createElement('div');
       st.className = 'stepper';
@@ -892,13 +949,86 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     li.appendChild(meta);
   }
 
+  // One set per size. With one size the page looks as it always has; with more, each set gets a heading with
+  // its own size menu, and its "add" tile adds photos at that size.
   function renderGrid() {
     const g = $('grid'); g.textContent = '';
-    for (const p of state.photos) g.appendChild(buildTile(p));
-    const li = document.createElement('li');
-    li.className = 'tile';
-    li.innerHTML = '<label class="addtile" for="more" role="button" tabindex="0">+ Add more photos</label>';
-    g.appendChild(li);
+    const gs = groups(), mixed = gs.length > 1;
+    if (!gs.length) gs.push({ size: sizeById(state.size), photos: [] });
+    for (const grp of gs) {
+      const sec = document.createElement('section');
+      sec.className = 'set'; sec.dataset.size = grp.size.id;
+      sec.setAttribute('aria-label', grp.size.name + ' prints');
+      if (mixed) sec.appendChild(setHead(grp));
+      const ul = document.createElement('ul'); ul.className = 'sheetgrid';
+      for (const p of grp.photos) ul.appendChild(buildTile(p));
+      const li = document.createElement('li'); li.className = 'tile';
+      const add = document.createElement('label');
+      add.className = 'addtile'; add.htmlFor = 'more'; add.setAttribute('role', 'button'); add.tabIndex = 0;
+      add.dataset.act = 'add'; add.dataset.size = grp.size.id;
+      add.textContent = mixed ? '+ Add more ' + grp.size.name : '+ Add more photos';
+      li.appendChild(add); ul.appendChild(li);
+      sec.appendChild(ul); g.appendChild(sec);
+    }
+    renderAnother();
+  }
+  function setHead(grp) {
+    const head = document.createElement('div');
+    head.className = 'set-head';
+    head.innerHTML = '<div class="what"><h3></h3><p class="hint"></p></div><label class="set-size"><span>Size</span><select></select></label>';
+    head.querySelector('h3').textContent = grp.size.name + ' prints';
+    const sel = head.querySelector('select');
+    sel.dataset.set = grp.size.id;
+    sel.setAttribute('aria-label', 'Size of these ' + grp.photos.length + (grp.photos.length === 1 ? ' photo' : ' photos'));
+    for (const s of SIZES) { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; sel.appendChild(o); }
+    sel.value = grp.size.id;
+    fillSetHead(head, grp);
+    return head;
+  }
+  function fillSetHead(head, grp) {
+    const prints = grp.photos.filter(p => p.status === 'ready').reduce((n, p) => n + p.qty, 0);
+    head.querySelector('.hint').textContent = prints
+      ? prints + (prints === 1 ? ' print' : ' prints') + ' at ' + money(unitPrice(grp.size, prints)) + ' each · ' + paperFor(grp.size).toLowerCase()
+      : 'Opening photos…';
+  }
+  function renderSetHeads() {
+    for (const grp of groups()) {
+      const head = $('grid').querySelector('.set[data-size="' + grp.size.id + '"] .set-head');
+      if (head) fillSetHead(head, grp);
+    }
+  }
+
+  // "Add photos in another size": choose the size, then the photo picker opens.
+  function renderAnother() {
+    const box = $('another-chips');
+    if (!box.children.length) {
+      for (const s of SIZES) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'chip'; b.dataset.add = s.id;
+        const box2 = shapeBox(s, 2.4);
+        b.innerHTML = '<span class="mini" style="width:' + box2.w + 'px;height:' + box2.h + 'px"></span><span class="n"></span><span class="p num"></span>';
+        b.querySelector('.n').textContent = s.name;
+        box.appendChild(b);
+      }
+    }
+    for (const b of box.children) {
+      const s = sizeById(b.dataset.add);
+      const have = state.photos.filter(p => p.size === s.id && p.status !== 'broken').reduce((n, p) => n + p.qty, 0);
+      b.querySelector('.p').textContent = money(unitPrice(s, have + 1));
+    }
+  }
+  function openAnother() {
+    renderAnother();
+    $('another-pick').hidden = false; $('another-btn').hidden = true;
+    $('another-btn').setAttribute('aria-expanded', 'true');
+    const first = $('another-chips').querySelector('button');
+    if (first) first.focus({ preventScroll: true });
+    $('another-pick').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  function closeAnother() {
+    if ($('another-pick').hidden) return;
+    $('another-pick').hidden = true; $('another-btn').hidden = false;
+    $('another-btn').setAttribute('aria-expanded', 'false');
   }
   function updateTile(p) {
     const li = $('grid').querySelector('[data-id="' + p.id + '"]');
@@ -941,8 +1071,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
 
   function renderEditor() {
     const p = find(state.editing); if (!p) return closeEditor();
-    const list = ready(), i = list.indexOf(p), s = sizeById(p.size);
-    $('ed-title').textContent = 'Photo ' + (state.photos.indexOf(p) + 1) + ' of ' + state.photos.length;
+    const list = ready(), i = list.indexOf(p), s = sizeById(p.size), all = ordered();
+    $('ed-title').textContent = 'Photo ' + (all.indexOf(p) + 1) + ' of ' + all.length;
     $('ed-prev').disabled = i <= 0; $('ed-next').disabled = i < 0 || i >= list.length - 1;
 
     const fr = $('ed-frame'), img = $('ed-img');
@@ -972,6 +1102,16 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
 
     for (const b of $('ed-mode').children) b.setAttribute('aria-checked', String(b.dataset.mode === modeOf(p)));
     $('ed-size').value = p.size;
+    // "Also print this photo in another size": the sizes this photo is already in can't be chosen again.
+    const mine = new Set(state.photos.filter(x => x.key === p.key).map(x => x.size));
+    const also = $('ed-also');
+    for (const o of also.options) {
+      if (!o.value) continue;
+      o.disabled = mine.has(o.value);
+      o.textContent = sizeById(o.value).name + (mine.has(o.value) ? ' (already in your order)' : '');
+    }
+    also.value = '';
+    also.disabled = state.photos.length >= CONFIG.MAX_PHOTOS || mine.size >= SIZES.length;
     $('ed-qty').textContent = p.qty;
     $('ed-minus').disabled = p.qty <= 1; $('ed-plus').disabled = p.qty >= 99;
     $('ed-reset').disabled = !p.manual;
@@ -981,7 +1121,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
 
   function removePhoto(p) {
     state.photos = state.photos.filter(x => x !== p);
-    if (p.thumb) URL.revokeObjectURL(p.thumb);
+    // The same photo in another size shares its preview, so only let the preview go with the last of them.
+    if (p.thumb && !state.photos.some(x => x.thumb === p.thumb)) URL.revokeObjectURL(p.thumb);
     p.ana = null;
     renderGrid(); updateDocket(); updateLoad();
   }
@@ -998,7 +1139,23 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     for (const s of SIZES) { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name + (s.papers.length === 1 ? ' (' + s.papers[0].toLowerCase() + ' only)' : ''); sel.appendChild(o); }
     sel.addEventListener('change', async () => {
       const p = find(state.editing); if (!p) return;
-      p.size = sel.value; await autoCrop(p); renderEditor(); updateTile(p); updateDocket();
+      p.size = sel.value; await autoCrop(p); renderGrid(); renderEditor(); updateDocket();   // it moves to that size's set
+    });
+    const also = $('ed-also');
+    { const o = document.createElement('option'); o.value = ''; o.textContent = 'Choose a size'; also.appendChild(o); }
+    for (const s of SIZES) { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; also.appendChild(o); }
+    also.addEventListener('change', async () => {
+      const p = find(state.editing), id = also.value;
+      also.value = '';
+      if (!p || !id || state.photos.length >= CONFIG.MAX_PHOTOS) return;
+      const twin = state.photos.find(x => x.key === p.key && x.size === id);
+      if (twin) { state.editing = twin.id; disarmRemove(); renderEditor(); return; }
+      // A second print of the same photo: its own size, copies and crop, sharing the photo and its preview.
+      const c = Object.assign({}, p, { id: 'p' + nextId++, size: id, qty: 1, manual: null, auto: Object.assign({}, p.auto) });
+      state.photos.splice(state.photos.indexOf(p) + 1, 0, c);
+      await autoCrop(c);
+      renderGrid(); updateDocket();
+      state.editing = c.id; disarmRemove(); renderEditor();
     });
     $('ed-mode').addEventListener('click', e => {
       const b = e.target.closest('button[data-mode]'); const p = find(state.editing); if (!b || !p) return;
@@ -1471,6 +1628,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     for (const p of state.photos) if (p.thumb) URL.revokeObjectURL(p.thumb);
     state.photos = []; state.queue = []; state.lastZip = null; state.editing = null;
     state.size = CONFIG.DEFAULT_SIZE; state.mode = 'fill'; state.finish = FINISHES[0];
+    state.groupOrder = []; state.addSize = null; closeAnother();
     $('checked').checked = false; $('order-error').textContent = ''; $('skipped').hidden = true;
     renderSettings(); renderGrid(); updateDocket(); go('start');
   }
@@ -1538,7 +1696,20 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     renderPrices(); buildSettings(); renderSettings(); setupEditor(); renderGrid(); updateDocket();
 
     $('pick').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
-    $('more').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+    $('more').addEventListener('change', e => {
+      const size = state.addSize || state.size;
+      state.addSize = null;
+      addFiles(e.target.files, size); e.target.value = '';
+      closeAnother();
+    });
+    $('another-btn').addEventListener('click', openAnother);
+    $('size-another').addEventListener('click', openAnother);
+    $('another-cancel').addEventListener('click', () => { closeAnother(); $('another-btn').focus(); });
+    $('another-chips').addEventListener('click', e => {
+      const b = e.target.closest('button[data-add]'); if (!b) return;
+      state.addSize = b.dataset.add;
+      $('more').click();   // the photo picker: the photos chosen come in at this size
+    });
     $('pick-label').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('pick').click(); } });
     $('samples').addEventListener('click', loadSamples);
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
@@ -1563,6 +1734,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     });
     $('grid').addEventListener('click', e => {
       const t = e.target.closest('[data-act]'); if (!t) return;
+      if (t.dataset.act === 'add') { state.addSize = t.dataset.size || null; return; }   // the tile then opens the picker
       const li = t.closest('[data-id]'); const p = li && find(li.dataset.id); if (!p) return;
       if (t.dataset.act === 'edit') openEditor(p.id);
       else if (t.dataset.act === 'remove') removePhoto(p);
@@ -1570,7 +1742,19 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       else if (t.dataset.act === 'minus' && p.qty > 1) { p.qty--; updateTile(p); updateDocket(); }
     });
     $('grid').addEventListener('keydown', e => {
-      const l = e.target.closest('label.addtile'); if (l && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); $('more').click(); }
+      const l = e.target.closest('label.addtile'); if (l && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); state.addSize = l.dataset.size || null; $('more').click(); }
+    });
+    // A set's size menu changes the size of every photo in that set (and only that set).
+    $('grid').addEventListener('change', e => {
+      const sel = e.target.closest('select[data-set]'); if (!sel) return;
+      const from = sel.dataset.set, to = sel.value;
+      if (from === to) return;
+      const i = state.groupOrder.indexOf(from);
+      if (i !== -1 && !state.groupOrder.includes(to)) state.groupOrder[i] = to;   // the set keeps its place
+      for (const p of state.photos) if (p.size === from) p.size = to;
+      renderGrid(); updateDocket(); refreshCrops();
+      const back = $('grid').querySelector('select[data-set="' + to + '"]') || $('size-chips').querySelector('[aria-checked="true"]');
+      if (back) back.focus({ preventScroll: true });
     });
     document.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
     document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
