@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your basket | Perfect Digital, East Ham</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preload" href="../fonts/fredoka-600.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Fredoka"; font-weight: 600; font-style: normal; font-display: swap; src: url(../fonts/fredoka-600.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 400; font-style: normal; font-display: swap; src: url(../fonts/montserrat-400.woff2) format("woff2"); }
+@font-face { font-family: "Montserrat"; font-weight: 600; font-style: normal; font-display: swap; src: url(../fonts/montserrat-600.woff2) format("woff2"); }
+:root {
+  --paper: #FAF8F4; --surface: #FFFFFF; --ink: #161A17; --muted: #5F665F; --line: #E6E1D8;
+  --green: #17803A; --green-soft: #E3F3E7; --red: #A8231B; --red-soft: #FDE4E1; --focus: #1D6FD8;
+  --display: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+  --body: "Montserrat", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); -webkit-text-size-adjust: 100%; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.wrap { max-width: 680px; margin: 0 auto; padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
+.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+.top img { display: block; height: 34px; width: auto; }
+.phone { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.phone a { color: var(--ink); font-weight: 600; text-decoration: none; }
+@media (max-width: 359px) { .phone .q { display: none; } }
+.crumbs { margin: 16px 0 0; font-size: 0.9rem; }
+.crumbs a { font-weight: 600; text-decoration: none; }
+h1, h2 { font-family: var(--display); font-weight: 600; line-height: 1.1; margin: 0; }
+h1 { font-size: clamp(2rem, 7vw, 2.6rem); margin: 14px 0 6px; }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+main { display: grid; gap: 18px; padding-bottom: 8px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.part { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.part + .part { border-top: 1px solid var(--line); padding-top: 14px; }
+.part .pic { width: 64px; height: 64px; border-radius: 10px; background: #EEE center / cover no-repeat; display: grid; place-items: center; color: var(--muted); font: 600 1.4rem/1 var(--display); }
+.part h3 { font: 600 1rem/1.3 var(--body); margin: 0; }
+.part .lines { font-size: 0.875rem; color: var(--muted); margin: 2px 0 0; padding: 0; list-style: none; }
+.part .when { font-size: 0.875rem; margin-top: 4px; }
+.part .amt { font-weight: 600; text-align: right; white-space: nowrap; }
+@media (max-width: 359px) { .part { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; } .part .pic { width: 48px; height: 48px; } }
+.part .rm { display: block; margin: 6px 0 0 auto; background: none; border: 0; padding: 6px 0; color: var(--red); font: 600 0.85rem/1 var(--body); cursor: pointer; }
+.total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-top: 1px dashed var(--line); padding-top: 12px; font-size: 1.1rem; font-weight: 600; }
+.choices { display: grid; gap: 10px; }
+.choice { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--green); background: var(--green-soft); }
+.choice input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--green); }
+.choice b { display: block; }
+.choice span span { color: var(--muted); font-size: 0.875rem; }
+.field { display: grid; gap: 6px; }
+.label { font-size: 0.8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+input[type="email"] { width: 100%; min-height: 48px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); padding: 0 14px; font: 400 16px/1.3 var(--body); }
+input[type="email"]:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px var(--green-soft); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 22px; border-radius: 999px; border: 1.5px solid transparent;
+  background: var(--green); color: #fff; font: 600 1.05rem/1.2 var(--body); text-decoration: none; cursor: pointer; text-align: center; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+.btn.ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn.block { width: 100%; }
+.status { font-size: 0.95rem; padding: 10px 12px; border-radius: 10px; background: var(--green-soft); color: #0F5A2A; }
+.status.err { background: var(--red-soft); color: var(--red); font-weight: 600; }
+.ordno { font: 600 1.15rem/1.2 var(--display); color: var(--green); }
+.done-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.done-list li { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 2px 12px; }
+.done-list .what { font-weight: 600; }
+.done-list .when { grid-column: 2; font-size: 0.875rem; color: var(--muted); }
+.actions { display: grid; gap: 10px; }
+footer { margin-top: 28px; padding: 22px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.875rem; }
+footer p { margin: 0 0 6px; }
+footer b { color: var(--ink); }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="https://www.perfect.digital/"><img src="../img/pd-logo.svg" alt="Perfect Digital" width="129" height="34"></a>
+  <div class="phone"><span class="q">Questions? </span><a href="tel:02085529419">020 8552 9419</a></div>
+</div></header>
+
+<main class="wrap" id="main">
+  <p class="crumbs"><a href="../">&lsaquo; Order something else</a></p>
+
+  <!-- the basket -->
+  <section id="view-basket" aria-labelledby="basket-title">
+    <h1 id="basket-title">Your basket</h1>
+    <p class="status" id="note" hidden></p>
+    <div id="empty" hidden>
+      <div class="panel">
+        <p>Your basket is empty.</p>
+        <a class="btn" href="../">Order photo prints, cards, calendars and more</a>
+      </div>
+    </div>
+    <div id="full" hidden style="display:grid; gap:18px">
+      <div class="panel">
+        <ul class="parts" id="parts" aria-label="What is in your basket"></ul>
+        <div class="total"><span>Total</span><span id="total"></span></div>
+      </div>
+      <a class="btn ghost block" href="../">+ Add something else</a>
+
+      <div class="panel">
+        <h2 id="pay-title">Paying and collecting</h2>
+        <div class="choices" role="radiogroup" aria-labelledby="pay-title">
+          <label class="choice"><input type="radio" name="how" value="online" id="how-online"><span><b>Pay now, collect later</b><span>Card, Apple Pay or Google Pay. <span id="ready-text"></span></span></span></label>
+          <label class="choice" id="shop-choice"><input type="radio" name="how" value="shop" id="how-shop"><span><b>I&rsquo;m in the shop now</b><span>Pay at the counter and we&rsquo;ll start on your order once you&rsquo;ve paid.</span></span></label>
+        </div>
+        <p class="small muted" id="who"></p>
+        <div class="field" id="email-field">
+          <label class="label" for="email">Email for your receipt (optional)</label>
+          <input type="email" id="email" autocomplete="email" inputmode="email" maxlength="100">
+        </div>
+        <p class="status err" id="error" role="alert" hidden></p>
+        <p class="status" id="progress" role="status" hidden></p>
+        <button class="btn block" type="button" id="go">Pay now</button>
+        <p class="small muted">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). Card payments are handled by Stripe, which keeps its own payment records. We only use your photos and details for your orders, and we delete them 30 days after.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- after paying, or sending to the shop -->
+  <section id="view-done" hidden aria-live="polite">
+    <div class="panel" id="done"></div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <p><b>Perfect Digital</b>, 211 High Street North, East Ham, London E6 1JG &middot; <a href="tel:02085529419">020 8552 9419</a> &middot; <a href="https://www.perfect.digital/">perfect.digital</a></p>
+</div></footer>
+
+<script src="basket.js?v=1"></script>
+<script>
+(() => {
+  'use strict';
+  const B = window.PDBasket;
+  const $ = id => document.getElementById(id);
+  const PHONE = '020 8552 9419';
+  const SHOP_LINE = 'Perfect Digital, 211 High Street North, East Ham E6 1JG. Monday to Saturday, 10am to 7pm.';
+  const IN_SHOP = { photo: 'payPhotoInShop', card: 'payInShop', product: 'payInShop' };
+  const SHOP = { closedWeekdays: [0], closedDates: ['2026-12-25', '2026-12-26', '2027-01-01'], hours: [10, 19] };
+  const money = B.money;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  let busy = false, leaving = false;
+
+  // Is the shop open right now? London time, whatever the phone's clock is set to.
+  function shopOpenNow() {
+    const p = {};
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+    const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday), hour = Number(p.hour) % 24;
+    return !SHOP.closedWeekdays.includes(dow) && !SHOP.closedDates.includes(p.year + '-' + p.month + '-' + p.day) && hour >= SHOP.hours[0] && hour < SHOP.hours[1];
+  }
+  // Each kind of order says when it's ready in its own words.
+  function readyLine(p, r) {
+    r = r || {};
+    if (p.script === 'photo') return r.collect === 'waiting' ? 'Printed while you wait, once paid.' : (r.readyText || p.readyText || '');
+    if (p.script === 'card') {
+      if (r.status === 'shop') return r.whileYouWait ? 'Printed while you wait, once paid.' : 'Ready the next working day after you pay.';
+      const w = r.status ? r.whileYouWait : p.whileYouWait;
+      return w ? 'We print these while you wait when you collect them.' : 'Ready ' + (r.readyText || p.readyText || '') + '.';
+    }
+    const t = r.readyText || p.readyText || '';
+    return t ? 'Ready to collect on ' + t + (r.status === 'shop' ? ', once paid.' : '.') : '';
+  }
+  function pic(p) {
+    const d = document.createElement('div');
+    d.className = 'pic';
+    if (p.thumb && /^data:image\/jpeg;base64,/.test(p.thumb)) d.style.backgroundImage = 'url("' + p.thumb + '")';
+    else d.textContent = (p.title || '?').charAt(0);
+    d.setAttribute('aria-hidden', 'true');
+    return d;
+  }
+
+  /* ---------- the basket ---------- */
+  function render() {
+    const parts = B.parts();
+    $('view-done').hidden = true; $('view-basket').hidden = false;
+    $('empty').hidden = parts.length > 0; $('full').hidden = !parts.length;
+    if (!parts.length) return;
+    const list = $('parts'); list.textContent = '';
+    for (const p of parts) {
+      const li = document.createElement('li'); li.className = 'part';
+      const mid = document.createElement('div');
+      const h = document.createElement('h3'); h.textContent = p.title; mid.appendChild(h);
+      if (p.lines && p.lines.length) {
+        const ul = document.createElement('ul'); ul.className = 'lines';
+        for (const l of p.lines.slice(0, 6)) { const x = document.createElement('li'); x.textContent = l; ul.appendChild(x); }
+        if (p.lines.length > 6) { const x = document.createElement('li'); x.textContent = 'and ' + (p.lines.length - 6) + ' more'; ul.appendChild(x); }
+        mid.appendChild(ul);
+      }
+      const when = document.createElement('p'); when.className = 'when'; when.textContent = readyLine(p); mid.appendChild(when);
+      const right = document.createElement('div');
+      const amt = document.createElement('div'); amt.className = 'amt'; amt.textContent = money(p.total); right.appendChild(amt);
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm'; rm.textContent = 'Remove';
+      rm.setAttribute('aria-label', 'Remove ' + p.title + ' from your basket');
+      rm.addEventListener('click', () => { if (busy) return; B.remove(p.orderNo); render(); });
+      right.appendChild(rm);
+      li.append(pic(p), mid, right);
+      list.appendChild(li);
+    }
+    $('total').textContent = money(B.total());
+    const open = shopOpenNow();
+    $('shop-choice').hidden = !open;
+    if (!open) $('how-online').checked = true;
+    if (!document.querySelector('input[name="how"]:checked')) $('how-online').checked = true;
+    const latest = parts.map(p => p.readyText).filter(Boolean);
+    $('ready-text').textContent = latest.length === 1 ? readyLine(parts[0]) : 'Each order says when it will be ready.';
+    const c = B.customer();
+    $('who').textContent = c && c.name ? 'For ' + c.name + (c.phone ? ', ' + c.phone : '') + '.' : '';
+    if (c && c.email && !$('email').value) $('email').value = c.email;
+    words();
+  }
+  function how() { const r = document.querySelector('input[name="how"]:checked'); return r ? r.value : 'online'; }
+  function words() {
+    if (busy) return;
+    $('go').textContent = how() === 'shop' ? 'Send my order to the shop' : 'Pay ' + money(B.total()) + ' now';
+    $('email-field').hidden = how() === 'shop';
+  }
+  document.querySelectorAll('input[name="how"]').forEach(r => r.addEventListener('change', words));
+  function fail(m) { $('error').hidden = false; $('error').textContent = m; $('progress').hidden = true; }
+  function progress(m) { $('progress').hidden = false; $('progress').textContent = m; }
+  function note(m, bad) { const n = $('note'); n.hidden = !m; n.textContent = m || ''; n.className = 'status' + (bad ? ' err' : ''); }
+
+  $('go').addEventListener('click', async () => {
+    if (busy) return;
+    $('error').hidden = true;
+    const parts = B.parts();
+    if (!parts.length) return render();
+    const email = $('email').value.trim();
+    if (how() === 'online' && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Check your email address, or leave it blank.');
+    if (how() === 'shop' && !shopOpenNow()) { render(); return fail('The shop is closed now, so please pay online.'); }
+    busy = true; $('go').disabled = true;
+    try {
+      if (how() === 'shop') await inShop(parts);
+      else await payOnline(parts, email);
+    } catch (e) {
+      fail(String((e && e.message) || e) + (/call us/i.test(String(e && e.message)) ? '' : ' If it keeps happening, call us on ' + PHONE + '.'));
+    } finally {
+      busy = false;
+      if (!leaving) { $('go').disabled = false; words(); }
+    }
+  });
+
+  // One Stripe payment for everything: the product orders script makes it, then every order checks that it lists
+  // it at its own price. Only then does the customer go to Stripe.
+  async function payOnline(parts, email) {
+    progress('Getting your payment ready…');
+    if (email) B.rememberCustomer(Object.assign({}, B.customer() || {}, { email }));
+    const before = B.pending();
+    const r = await B.call('product', 'startBasketPayment', { parts: parts.map(p => ({ order: p.orderNo, total: p.total, title: p.title })), email,
+      previous: (before && before.session) || B.previous() });
+    if (r.status === 'paid') return confirmAll(r.session);   // the basket's last payment page was paid after all
+    for (const p of parts) {
+      let a;
+      try { a = await B.call(p.script, 'basketAttach', { order: p.orderNo, token: p.token, session: r.session }); }
+      catch (e) {
+        await B.call('product', 'cancelBasketPayment', { session: r.session }).catch(() => {});
+        throw e;
+      }
+      if (a.status !== 'attached') {   // already with the shop: paid on an earlier payment page
+        await B.call('product', 'cancelBasketPayment', { session: r.session }).catch(() => {});
+        return confirmAll(before && before.session);
+      }
+    }
+    B.setPending({ basket: r.basket, session: r.session, total: r.total });
+    progress('Taking you to the payment page…');
+    leaving = true;
+    location.assign(r.payUrl);
+  }
+
+  // Back from Stripe (or back to this page later): each order checks the payment with Stripe itself.
+  async function confirmAll(session) {
+    const parts = B.parts();
+    if (!parts.length) return session ? forgotten(session) : render();
+    showDone('<p>Checking your payment…</p>');
+    const got = {};
+    // An order the payment doesn't cover (the basket changed after this payment page was made) is simply not paid yet.
+    const notCovered = e => /does not match/.test(String((e && e.message) || e));
+    const final = r => !!r && (r.final === true || /^(paid|shop|sent|gone|expired)$/.test(r.status));
+    for (let round = 0; round < 6; round++) {
+      for (const p of parts) {
+        if (final(got[p.orderNo])) continue;
+        try { got[p.orderNo] = await B.call(p.script, 'basketConfirm', { order: p.orderNo, token: p.token, session: session || '' }); }
+        catch (e) { got[p.orderNo] = notCovered(e) ? { status: 'unpaid', final: true } : { status: 'error', message: String((e && e.message) || e) }; }
+      }
+      if (parts.every(p => final(got[p.orderNo]))) break;
+      const all = parts.map(p => got[p.orderNo].status);
+      if (round >= 1 && !all.includes('paid') && !all.includes('error')) break;   // nothing paid: they left Stripe without paying
+      await sleep(2500);   // just paid: Stripe can take a moment to confirm
+    }
+    const statuses = parts.map(p => got[p.orderNo].status);
+    if (statuses.every(s => s === 'paid')) return paid(parts, got);
+    const done = parts.filter(p => got[p.orderNo].status === 'paid');
+    if (done.length && statuses.every(s => s !== 'error')) {
+      // Paid on an earlier payment page, before the basket changed: those orders are with the shop; the rest still need paying.
+      done.forEach(p => B.remove(p.orderNo));
+      B.forgetPayments();   // that payment is used up: the rest of the basket gets a payment page of its own
+      render();
+      note('Thank you: ' + done.map(p => p.orderNo + ' (' + p.title + ')').join(', ') + (done.length === 1 ? ' is' : ' are') + ' paid and with the shop. The rest of your basket isn’t paid for yet.', false);
+      return;
+    }
+    if (statuses.includes('error')) {
+      return showDone('<h2>We&rsquo;re still checking your payment</h2><p>' + parts.map(p => esc(p.orderNo) + ' (' + esc(p.title) + '): ' + (got[p.orderNo].status === 'paid' ? 'paid and with the shop' : 'still checking')).join('<br>') +
+        '</p><p>If you were charged, your orders are safe: they reach the shop within a few minutes and we will make them. Questions? Call us on ' + PHONE + '.</p><a class="btn ghost" href="./">Check again</a>');
+    }
+    if (statuses.every(s => s === 'gone')) {
+      B.clear();
+      return showDone('<h2>This basket has expired</h2><p>Nothing was taken from your card. Please make your order again, or call us on ' + PHONE + '.</p><a class="btn" href="../">Order online</a>');
+    }
+    render();
+    note("Your basket isn't paid for yet. Nothing has been taken from your card." + (statuses.includes('gone') ? ' An order in it has expired: remove it and add it again.' : ''), false);
+  }
+
+  // Back from Stripe in a browser that no longer has the basket (opened in another app, say): the payment itself says
+  // which orders it was for. Each order's own payment check sends it to the shop within a few minutes.
+  async function forgotten(session) {
+    showDone('<p>Checking your payment…</p>');
+    try {
+      const r = await B.call('product', 'basketStatus', { session });
+      if (r.status === 'paid') {
+        return showDone('<h2>Thank you, your basket is paid</h2><p>' + money(r.total) + ' paid online, so there is nothing more to pay. Your order numbers: <b>' + r.parts.map(esc).join(', ') +
+          '</b>. They reach the shop within a few minutes.</p><p>Collect from ' + SHOP_LINE + '</p><div class="actions"><a class="btn" href="../">Order something else</a></div>');
+      }
+      return showDone('<h2>This payment isn&rsquo;t finished</h2><p>Nothing was taken from your card. Please go back to the page you ordered on, or call us on ' + PHONE + '.</p><a class="btn" href="../">Order online</a>');
+    } catch (e) {
+      showDone('<p class="status err">' + esc((e && e.message) || e) + '</p><p>If you paid, your orders are safe. Questions? Call us on ' + PHONE + '.</p>');
+    }
+  }
+
+  function paid(parts, got) {
+    const total = parts.reduce((t, p) => t + Number(got[p.orderNo].total || p.total), 0);
+    const items = parts.map(p => '<li><span class="ordno">' + esc(got[p.orderNo].orderNo || p.orderNo) + '</span><span class="what">' + esc(p.title) + '</span><span class="when">' + esc(readyLine(p, got[p.orderNo])) + '</span></li>').join('');
+    B.clear();
+    showDone('<h2>Thank you, your basket is paid</h2><p>' + money(total) + ' paid online, so there is nothing more to pay. Your order numbers:</p><ul class="done-list">' + items + '</ul>' +
+      '<p>Collect from ' + SHOP_LINE + '</p><p class="small muted">Stripe emails a receipt if you gave your email. We&rsquo;ll call you on the number you gave if there&rsquo;s a problem with a photo.</p>' +
+      '<div class="actions"><a class="btn" href="../">Order something else</a></div>');
+  }
+
+  // In the shop: every order goes to the shop marked PAY FIRST, and the customer pays for them all at the counter.
+  async function inShop(parts) {
+    const got = {};
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      progress('Sending your orders to the shop (' + (i + 1) + ' of ' + parts.length + ')…');
+      try { got[p.orderNo] = await B.call(p.script, IN_SHOP[p.script], { order: p.orderNo, token: p.token }); }
+      catch (e) {
+        const sent = parts.slice(0, i);
+        if (!sent.length) throw e;
+        sent.forEach(x => B.remove(x.orderNo));
+        throw new Error(sent.map(x => x.orderNo).join(', ') + (sent.length === 1 ? ' is' : ' are') + ' with the shop, but ' + p.orderNo + ' could not be sent: ' + ((e && e.message) || e));
+      }
+    }
+    const total = parts.reduce((t, p) => t + Number(got[p.orderNo].total || p.total), 0);
+    const wasPaid = parts.every(p => got[p.orderNo].status === 'paid');
+    const items = parts.map(p => '<li><span class="ordno">' + esc(got[p.orderNo].orderNo || p.orderNo) + '</span><span class="what">' + esc(p.title) + ' &middot; ' + money(got[p.orderNo].total || p.total) + '</span><span class="when">' + esc(readyLine(p, got[p.orderNo])) + '</span></li>').join('');
+    B.clear();
+    if (wasPaid) return showDone('<h2>Thank you, your basket is paid</h2><p>It was paid online, so there is nothing more to pay.</p><ul class="done-list">' + items + '</ul><div class="actions"><a class="btn" href="../">Order something else</a></div>');
+    showDone('<h2>Your orders are with the shop</h2><p><b>Pay ' + money(total) + ' at the counter now</b> and we&rsquo;ll start on them. Show these order numbers when you pay:</p><ul class="done-list">' + items + '</ul>' +
+      '<p class="small muted">We&rsquo;ll call you on the number you gave if there&rsquo;s a problem with a photo.</p><div class="actions"><a class="btn ghost" href="../">Order something else</a></div>');
+  }
+
+  function showDone(html) {
+    $('view-basket').hidden = true; $('view-done').hidden = false;
+    $('done').innerHTML = html;
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- opening the page ---------- */
+  const q = new URLSearchParams(location.search);
+  if (q.get('paid') || q.get('unpaid')) {
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* fine */ }
+  }
+  if (q.get('paid')) confirmAll(q.get('paid').replace(/[^A-Za-z0-9_]/g, ''));
+  else if (q.get('unpaid')) {
+    render();
+    note("Your basket isn't paid for yet. Nothing has been taken from your card. You can pay now, or at the counter if you're in the shop.", false);
+  } else if (B.pending() && B.count()) {
+    confirmAll(B.pending().session);   // back to the basket after going to Stripe: paid, or not yet?
+  } else render();
+  // The Back button from Stripe can bring this page back exactly as it was left.
+  window.addEventListener('pageshow', e => { if (e.persisted && B.pending() && B.count()) { leaving = false; busy = false; $('go').disabled = false; confirmAll(B.pending().session); } });
+})();
+</script>
+</body>
+</html>

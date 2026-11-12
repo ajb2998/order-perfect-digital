@@ -201,6 +201,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
   <section class="done" id="done" hidden aria-live="polite"></section>
 </main>
 
+<script src="../basket/basket.js?v=1"></script>
 <script>
 (function () {
   'use strict';
@@ -510,6 +511,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const token = (() => { const a = new Uint8Array(16); crypto.getRandomValues(a); return 'k-' + Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); })();
   let setup = null, busy = false, saver = null;
+  // One basket (12 Nov 2026): while it is switched on, the calendar goes into the shop's basket (with prints, cards and
+  // more) instead of being paid for here. Needs the basket switched on and the order script to take basket orders.
+  let BASKET = false;
   try { if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then(d => { saver = d; }, () => {}); } catch (e) { /* not in the preview */ }
 
   function server(fn, arg) {
@@ -529,12 +533,15 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
     const online = document.querySelector('input[name="pay"][value="online"]'), shop = document.querySelector('input[name="pay"][value="shop"]');
     if (!on && online.checked) online.checked = false;
     if (!payChoice()) (on ? online : shop).checked = true;
+    // In the basket the customer chooses how to pay once, for everything.
+    $('pay-choice').hidden = BASKET;
+    if (BASKET) window.PDBasket.fill({ name: 'cust-name', phone: 'cust-phone', offers: 'cust-offers' });
     updateTotal();
   }
   function qty() { return Number($('qty').value) || 1; }
   function updateTotal() {
     $('total').textContent = money(qty() * PRICE);
-    $('send').textContent = payChoice() === 'online' ? 'Pay ' + money(qty() * PRICE) + ' now' : 'Send my order';
+    $('send').textContent = BASKET ? 'Add to basket' : payChoice() === 'online' ? 'Pay ' + money(qty() * PRICE) + ' now' : 'Send my order';
   }
   $('qty').innerHTML = Array.from({ length: MAX_QTY }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + (i ? ' calendars' : ' calendar') + '</option>').join('');
   $('qty').addEventListener('change', updateTotal);
@@ -557,7 +564,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
     const fail = m => { s.hidden = false; s.className = 'status err'; s.textContent = m; };
     const empty = state.pages.filter(p => !p.img).length;
     if (empty) { fail(empty === 13 ? 'Add your photos first.' : empty + (empty === 1 ? ' page has' : ' pages have') + ' no photo yet. Tap the grey pages to add one.'); return; }
-    const name = $('cust-name').value.replace(/\s+/g, ' ').trim(), phone = $('cust-phone').value.trim(), pay = payChoice(), n = qty();
+    const name = $('cust-name').value.replace(/\s+/g, ' ').trim(), phone = $('cust-phone').value.trim(), pay = BASKET ? 'basket' : payChoice(), n = qty();
     if (!name) { fail('Add your name, so we know whose calendar this is.'); $('cust-name').focus(); return; }
     if (phone.replace(/\D/g, '').length < 10) { fail('Add your mobile number (at least 10 digits).'); $('cust-phone').focus(); return; }
     if (!pay) { fail('Choose how you would like to pay.'); return; }
@@ -579,6 +586,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
         items: [{ occasion: 'calendar', design: 'calendar-a4', start: state.start, names: state.title, qty: n, pdf: await toBase64(blob), thumb: coverJpeg() }]
       });
       if (res.status === 'pay') { leaving = true; s.textContent = 'Taking you to the payment page…'; location.assign(res.payUrl); return; }
+      if (res.status === 'held') { addedToBasket(res, name, phone); return; }
       showDone(res);
     } catch (e) {
       fail('We could not send your order. ' + (e.message || e) + ' If it keeps happening, call us on ' + PHONE + '.');
@@ -596,6 +604,21 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
     const again = $('again'); if (again) again.addEventListener('click', () => { if (TEST_MODE) location.reload(); else location.assign(RETURN_URL); });
   }
   const AGAIN = '<button class="btn ghost" type="button" id="again">Make another calendar</button>';
+  // In the basket now: the calendar waits with the order script until the basket is paid for.
+  function addedToBasket(res, name, phone) {
+    let thumb = '';
+    try {
+      const c = document.createElement('canvas'); c.width = 120; c.height = Math.round(120 * 297 / 210);
+      drawPage(c.getContext('2d'), 0, c.width, c.height);
+      thumb = window.PDBasket.thumb(c);
+    } catch (e) { /* no picture */ }
+    window.PDBasket.add({ script: 'card', kind: 'calendar', orderNo: res.orderNo, token, title: res.cards > 1 ? res.cards + ' photo calendars' : 'Photo calendar',
+      lines: res.lines || [], total: res.total, readyText: res.readyText, whileYouWait: !!res.whileYouWait, thumb });
+    window.PDBasket.rememberCustomer({ name, phone, offers: !!($('cust-offers') && $('cust-offers').checked) });
+    showOnly('<h2>Added to your basket</h2><p>' + (res.cards > 1 ? res.cards + ' calendars' : 'Your calendar') + ', ' + money(res.total) + '. Add photo prints, cards, a canvas or a mug too, and pay for everything at once.</p>' +
+      '<p><a class="btn" href="' + window.PDBasket.BASKET_URL + '">Go to your basket and pay ' + money(window.PDBasket.total()) + '</a></p>' +
+      '<p><a class="btn ghost" href="' + window.PDBasket.HOME_URL + '">Add prints, cards, a canvas or a mug</a></p>' + AGAIN);
+  }
   function showDone(res) {
     if (res.status === 'paid') {
       showOnly('<h2>Thank you</h2><p>You&rsquo;ve paid ' + money(res.total) + '. Your order number is</p><div class="ordno">' + esc(res.orderNo) + '</div>' +
@@ -662,7 +685,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* fine */ }
     handleReturn(prm);
   }
-  getSetup().then(s => setOnline(!!(s.calendars && s.online))).catch(() => setOnline(false));
+  const basketOn = window.PDBasket && !TEST_MODE ? window.PDBasket.enabled() : Promise.resolve(false);
+  getSetup().then(s => basketOn.then(on => { BASKET = on && !!(s.calendars && s.online && s.basket); setOnline(!!(s.calendars && s.online)); })).catch(() => setOnline(false));
 })();
 </script>
 <script>

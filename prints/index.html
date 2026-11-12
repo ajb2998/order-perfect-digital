@@ -512,6 +512,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   </div>
 </div>
 
+<script src="../basket/basket.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/smartcrop@2.0.5/smartcrop.js"></script>
 <script>
@@ -556,6 +557,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   // Paying online (Stripe) is offered on the shop's own address once the order script says it is switched on.
   // Then every order is either paid online, or placed by a customer in the shop who pays at the counter first.
   let ONLINE = false;
+  // One basket (12 Nov 2026): while it is switched on, the order goes into the shop's basket (with cards, calendars
+  // and more) instead of being paid for here. Needs the basket switched on and the order script to take basket orders.
+  let BASKET = false;
   let setupReady = Promise.resolve();
   const pageUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
   const state = {
@@ -660,7 +664,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     if (!open) { waiting.checked = false; $('collect-later').checked = true; }
     showPayWords();
   }
-  function payChoice() { return ONLINE && collectChoice() === 'later' ? 'online' : 'collect'; }
+  function payChoice() { return BASKET ? 'basket' : ONLINE && collectChoice() === 'later' ? 'online' : 'collect'; }
   // The words that depend on how the order is paid for.
   function showPayWords() {
     const t = totals(), c = collectChoice();
@@ -672,8 +676,14 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     $('pay-stripe').hidden = !ONLINE;
     const tot = $('sum-total-label');
     if (tot) tot.textContent = c === 'waiting' ? 'To pay at the counter' : (ONLINE ? (c === 'later' ? 'To pay now' : 'Total') : 'To pay when you collect');
-    if (isLive && !state.busy) $('send').textContent = payChoice() === 'online' ? 'Send my photos and pay ' + pounds(t.total) : 'Send my photos to the shop';
+    if (isLive && !state.busy) $('send').textContent = payChoice() === 'basket' ? 'Add to basket' : payChoice() === 'online' ? 'Send my photos and pay ' + pounds(t.total) : 'Send my photos to the shop';
     $('dk-sub').textContent = pounds(t.total) + (ONLINE ? ' · pay online or in the shop' : ' · pay when you collect');
+    // In the basket the customer chooses how to pay and collect once, for everything.
+    $('collect-label').closest('.field').hidden = BASKET;
+    if (BASKET) {
+      $('pay-small').textContent = 'Collect from';
+      if (tot) tot.textContent = 'Total';
+    }
   }
   function laterText() {
     const d = nextOpenDay(new Date());
@@ -1362,9 +1372,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     $('order-error').textContent = '';
     await setupReady;
     const name = $('cust-name').value.trim(), phone = $('cust-phone').value.trim(), email = $('cust-email').value.trim();
-    const collect = collectChoice();
+    const collect = BASKET ? 'later' : collectChoice();
     if (!collect) return fail("Choose whether you're in the shop now or collecting later.");
-    if (collect === 'waiting' && !shopOpenNow()) {
+    if (!BASKET && collect === 'waiting' && !shopOpenNow()) {
       showCollectChoices();
       return fail("The shop is closed now, so we've changed your order to collect later. Check when it will be ready, then send it again.");
     }
@@ -1485,8 +1495,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     setProgress(5, 'Sending print 1 of ' + files.length + '…');
     await Promise.all([worker(), worker()]);
     if (failed) throw failed;
-    setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : 'Finishing your order…');
+    setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : order.pay === 'basket' ? 'Adding to your basket…' : 'Finishing your order…');
     const res = await runRetry('finishPhotoOrder', started.token, pageUrl());
+    if (res && res.status === 'held') { setProgress(100, 'Added'); return addedToBasket(order, res, started.token); }
     if (res && res.status === 'pay') {
       // The photos are with the shop's order script; they reach the shop once Stripe says the order is paid.
       if (!res.payUrl) throw new Error("Paying online isn't working just now. Please call us on " + SHOP_PHONE + '.');
@@ -1583,6 +1594,24 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     }
     add('p', 'If you leave it, we delete your photos after a day and nothing is charged. Questions? Call us on ' + SHOP_PHONE + '.', 'small muted');
     startAgainButton(box);
+  }
+
+  // In the basket now: the photos are with the order script, waiting for the basket to be paid for.
+  function addedToBasket(order, res, token) {
+    const first = ready().find(p => p.ana);
+    window.PDBasket.add({ script: 'photo', kind: 'prints', orderNo: res.orderNo, token, title: 'Photo prints',
+      lines: res.lines || [], total: res.total, readyText: res.readyText, thumb: first ? window.PDBasket.thumb(first.ana) : '' });
+    window.PDBasket.rememberCustomer(order.customer);
+    const { box, add } = doneBox();
+    add('h2', 'Added to your basket');
+    add('p', res.prints + (res.prints === 1 ? ' print, ' : ' prints, ') + pounds(res.total) + '. Add cards, calendars, canvases or mugs too, and pay for everything at once.', 'muted');
+    const row = document.createElement('div'); row.style.display = 'grid'; row.style.gap = '10px';
+    const pay = document.createElement('a'); pay.className = 'btn btn-primary'; pay.href = window.PDBasket.BASKET_URL;
+    pay.textContent = 'Go to your basket and pay ' + pounds(window.PDBasket.total());
+    const more = document.createElement('a'); more.className = 'btn btn-ghost'; more.href = window.PDBasket.HOME_URL; more.textContent = 'Add cards, calendars, canvases or mugs';
+    const again = document.createElement('button'); again.type = 'button'; again.className = 'linkish'; again.textContent = 'Print more photos';
+    again.addEventListener('click', resetAll);
+    row.append(pay, more, again); box.appendChild(row);
   }
 
   function showDone(order, how) {
@@ -1713,7 +1742,11 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     $('pick-label').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('pick').click(); } });
     $('samples').addEventListener('click', loadSamples);
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
-    $('dk-next').addEventListener('click', () => { if (!$('dk-next').disabled) go('details'); });
+    $('dk-next').addEventListener('click', () => {
+      if ($('dk-next').disabled) return;
+      go('details');
+      if (BASKET) window.PDBasket.fill({ name: 'cust-name', phone: 'cust-phone', email: 'cust-email', offers: 'offers' });
+    });
     $('send').addEventListener('click', submit);
 
     $('size-chips').addEventListener('click', e => {
@@ -1763,7 +1796,12 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
 
     // Paying online: ask the order script whether it is switched on, and pick up an order coming back from Stripe.
     if (isOwnSite) {
-      setupReady = runRetry('getSetup').then(s => { ONLINE = !!(s && s.online); showPayWords(); }).catch(() => { /* the page carries on without it */ });
+      const basketOn = window.PDBasket ? window.PDBasket.enabled() : Promise.resolve(false);
+      setupReady = runRetry('getSetup').then(s => basketOn.then(on => {
+        ONLINE = !!(s && s.online);
+        BASKET = on && ONLINE && !!(s && s.basket);
+        showPayWords();
+      })).catch(() => { /* the page carries on without it */ });
       const q = new URLSearchParams(location.search);
       const mine = pending.get();
       if (q.get('paid') || q.get('unpaid')) backFromStripe({ paid: q.get('paid'), unpaid: q.get('unpaid'), t: q.get('t') });
