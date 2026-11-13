@@ -1,0 +1,11 @@
+#!/bin/sh
+# Checks every commit about to be pushed, one by one, so a detail added in one commit and removed in the next is still caught.
+Z=0000000000000000000000000000000000000000
+FAIL=0
+while read -r lref lsha rref rsha; do
+  [ "$lsha" = "$Z" ] && continue
+  if [ "$rsha" = "$Z" ]; then range=$(git rev-list "$lsha" --not --remotes); else range=$(git rev-list "$rsha..$lsha"); fi
+  for c in $range; do "$(dirname "$0")/check-personal-data.sh" commit "$c" || FAIL=1; done
+done
+[ $FAIL -eq 0 ] || { echo "Push stopped. Nothing was sent." >&2; exit 1; }
+exit 0

@@ -1,0 +1,3 @@
+# Addresses that may appear in this repository, one per line. Public shop addresses only, never a person's own.
+info@perfect.digital
+noreply@perfect.digital
