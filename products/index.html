@@ -2607,7 +2607,7 @@ PD.unitPrice = function (it) {
   // In the basket now: the order waits with the order script until the basket is paid for.
   async function addedToBasket(cust, fin, token) {
     const items = fin.items || [];
-    const title = basket.length === 1 ? basket[0].title : 'Canvases, posters and mugs';
+    const title = basket.length === 1 ? basket[0].title : (GIFTS_LIVE ? 'Canvases, posters and gifts' : 'Canvases, posters and mugs');
     let thumb = '';
     try { const img = new Image(); img.src = basket[0].thumb; await img.decode(); thumb = window.PDBasket.thumb(img); } catch (e) { /* no picture */ }
     window.PDBasket.add({ script: 'product', kind: 'products', orderNo: fin.orderNo, token, title,
