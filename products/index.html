@@ -957,7 +957,9 @@ PD.readyDate = function (lead, now) {
     g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, T.w, T.h);
     const [ax, ay, aw, ah] = T.area;
     PD.drawMugDesign(g, st, ax, ay, aw, ah);
-    if (type.template === 'durham') {
+    if (!PD.PRINT_MARKS) {
+      // 14 Nov 2026: no cut lines, crop marks or outlines on any print file (they came out on the finished print).
+    } else if (type.template === 'durham') {
       g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 0, T.w, 2); g.fillRect(0, T.h - 2, T.w, 2);
     } else {
       // crop marks in the corners at the trimmed sheet's edges (as in the enamel template)
@@ -1186,14 +1188,14 @@ PD.TEMPLATES = {
     g.save();
     if (G.turned) { g.translate(bx, by + bh); g.rotate(-Math.PI / 2); } else g.translate(bx, by);
     const uw = G.turned ? bh : bw, uh = G.turned ? bw : bh;
-    if (T.line === 'window') {   // the template's thin grey line just outside the window, to line the item up by
+    if (PD.PRINT_MARKS && T.line === 'window') {   // the template's thin grey line just outside the window, to line the item up by
       g.beginPath(); G.path(g, 0, 0, uw, uh); g.lineWidth = 5 * lw; g.strokeStyle = '#787878'; g.lineJoin = 'round'; g.stroke();
     }
     g.beginPath(); G.path(g, 0, 0, uw, uh); g.clip();
     g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, uw, uh);
     draw(g, uw, uh);
     g.restore();
-    if (T.line === 'edge') {     // the template's thin grey line round the edge of the sheet
+    if (PD.PRINT_MARKS && T.line === 'edge') {     // the template's thin grey line round the edge of the sheet
       g.lineWidth = lw; g.strokeStyle = '#5A5A5A'; g.strokeRect(lw / 2, lw / 2, c.width - lw, c.height - lw);
     }
     return c;
@@ -1222,7 +1224,7 @@ PD.TEMPLATES = {
         const u = T.path[i] / 1e5, v = T.path[i + 1] / 1e5;
         im.clip.push(G.turned ? [im.x + v * im.dw, im.y + (1 - u) * im.dh] : [im.x + u * im.dw, im.y + v * im.dh]);
       }
-      if (T.line === 'window') im.line = { w: 5 / 300 * 72, grey: 0.47 };
+      if (PD.PRINT_MARKS && T.line === 'window') im.line = { w: 5 / 300 * 72, grey: 0.47 };
     }
     return { w: wPt, h: hPt, images: [im] };
   };
@@ -1238,6 +1240,8 @@ window.PD = window.PD || {};
 // The shop's Google rating, shown on the first screen. Checked 9 Nov 2026 (4.9 from 330 reviews): update now and then.
 PD.RATING = { stars: '4.9', reviews: '330+' };
 PD.LIVE = ['canvas', 'poster', 'mug'];
+// Print files carry the picture only: no cut lines, crop marks or template outlines (Arshan, 14 Nov 2026).
+PD.PRINT_MARKS = false;
 PD.CATALOGUE = {
   canvas: {
     name: 'Canvas prints', lead: 'nextday', blurb: 'Your photo on a canvas, stretched on a wooden frame, ready to hang.',
