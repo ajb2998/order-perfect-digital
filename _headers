@@ -1,0 +1,27 @@
+# Headers for order.perfect.digital on Cloudflare Pages. GitHub Pages ignores this file.
+#
+# What the pages are allowed to load and talk to (Content-Security-Policy):
+#   scripts and styles: the site's own (the pages keep theirs inline); styles also from Google Fonts
+#   fonts: the site's own, fonts built into the page, and Google Fonts
+#   pictures: the site's own and the customer's photos while they are on the page (data: and blob:)
+#   sending orders: the three Google order scripts, and nothing else
+#   nobody may show these pages inside a frame on another site
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), payment=()
+  Strict-Transport-Security: max-age=15552000
+
+# Files that never change under the same name can be kept by the browser.
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The Cloudflare test addresses are copies of the site: keep them out of search results.
+https://order-perfect-digital.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.order-perfect-digital.pages.dev/*
+  X-Robots-Tag: noindex
