@@ -1,6 +1,6 @@
 #!/bin/sh
 # Stops a commit or a push that would publish a real-looking UK mobile number or a personal email address.
-# Why: on 9 to 13 Nov 2026 two real numbers and a personal address were committed to a public repository.
+# Why: real contact details must never go into a repository.
 # Rule: test data is made up. Mobiles come from 07700 900000 to 07700 900999. Emails use example.com.
 # This file holds patterns only. It must never hold a real number or address.
 #
