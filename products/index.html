@@ -1241,11 +1241,14 @@ PD.TEMPLATES = {
    always works the price out itself. Sizes are width x height in inches (landscape first). */
 'use strict';
 window.PD = window.PD || {};
-// What can be ordered online now. The rest of the catalogue below is ready but waits until its print area has been
-// checked on the shop's kit: add 'collage', 'cushion' or 'gift' here AND to CONFIG.LIVE in the product orders script.
+// What can be ordered online now: the same list as CONFIG.LIVE in the product orders script. Cushions and gifts went
+// on sale on 14 Nov 2026, once Arshan had checked a test print of each on the shop's kit. Collage prints still wait.
 // The shop's Google rating, shown on the first screen. Checked 9 Nov 2026 (4.9 from 330 reviews): update now and then.
 PD.RATING = { stars: '4.9', reviews: '330+' };
-PD.LIVE = ['canvas', 'poster', 'mug'];
+PD.LIVE = ['canvas', 'poster', 'mug', 'cushion', 'gift'];
+// Gifts kept off the site for now (Arshan, 14 Nov 2026): the same list as CONFIG.HELD in the product orders script.
+// To put one on sale, take it out of both lists.
+PD.HELD = ['slate-heart-small', 'slate-heart-large'];
 // Print files carry the picture only: no cut lines, crop marks or template outlines (Arshan, 14 Nov 2026).
 PD.PRINT_MARKS = false;
 PD.CATALOGUE = {
@@ -1354,6 +1357,9 @@ PD.CATALOGUE = {
   },
 };
 
+// The live page never lists a held gift (the test version, which has no order script, still shows them all).
+if (window.PD_PRODUCTS_API) PD.CATALOGUE.gift.groups.forEach(function (g) { g.items = g.items.filter(function (i) { return PD.HELD.indexOf(i.id) === -1; }); });
+
 // Not on sale online yet (Arshan, 11 Nov 2026: bags, wallets, baby items and the rest wait; no templates checked).
 // Nothing reads this list: move a group into CATALOGUE.gift.groups, with its template, when it is ready.
 // Dropped altogether: the 9 window cushion, the pink glitter heart cushion and the hanging heart slate.
@@ -1416,6 +1422,7 @@ PD.unitPrice = function (it) {
   // The test version shows the whole catalogue; the live page only what the shop takes orders for now (PD.LIVE).
   const LIVE = TEST ? Object.keys(PD.CATALOGUE) : (PD.LIVE || Object.keys(PD.CATALOGUE));
   const GIFTS_LIVE = LIVE.includes('cushion') || LIVE.includes('gift');
+  const HEART_SLATES = C.gift.groups.some(g => g.items.some(i => i.id === 'slate-heart-small'));   // false while they are held back (PD.HELD)
   // Why orders can't be taken just now ('' when they can). Shown across the top and on the basket, so nobody
   // designs a whole order and only finds out when they press Pay.
   let closed = '';
@@ -1584,7 +1591,7 @@ PD.unitPrice = function (it) {
       ['cushion', 'Cushions', 'from ' + PD.money(Math.min(...C.cushion.items.map(i => i.price))), 'Square, heart and sequin'],
     ].map(f => f.concat(f[0]));
     // Each kind of gift has its own tile (they are all the product "gift" to the order script).
-    const GIFT_NOTES = { jigsaw: 'A4 and A3, 30 to 150 pieces', keyring: 'Round, heart, metal and bottle opener', magnet: 'Heart, square, ceramic and metal', slate: 'Square, rectangle and heart' };
+    const GIFT_NOTES = { jigsaw: 'A4 and A3, 30 to 150 pieces', keyring: 'Round, heart, metal and bottle opener', magnet: 'Heart, square, ceramic and metal', slate: HEART_SLATES ? 'Square, rectangle and heart' : 'Square and rectangle' };
     for (const gr of C.gift.groups) fams.push([gr.id, gr.name, 'from ' + PD.money(Math.min(...gr.items.map(i => i.price))), GIFT_NOTES[gr.id] || '', 'gift']);
     const tiles = el('div', { class: 'tiles' });
     for (const [id, name, from, note] of fams.filter(f => LIVE.includes(f[4]))) {
@@ -1633,7 +1640,7 @@ PD.unitPrice = function (it) {
         drawFlat(g, W * 0.09, (H - mw / M.aspect) / 2, mw, mw / M.aspect, M, samplePhoto(img, M));
         drawFlat(g, W * 0.55, (H - sq) / 2, sq, sq, SQ, samplePhoto(img, SQ));
       } else {
-        const SL = PD.tpl('slate-15x20', 'portrait'), sh = H * 0.7, HS = PD.tpl('slate-heart-small'), hw = W * 0.36;
+        const SL = PD.tpl('slate-15x20', 'portrait'), sh = H * 0.7, HS = PD.tpl(HEART_SLATES ? 'slate-heart-small' : 'slate-15x15'), hw = W * 0.36;
         drawSlate(g, W * 0.1, (H - sh) / 2, sh * SL.aspect, sh, SL, samplePhoto(img, SL));
         drawSlate(g, W * 0.54, (H - hw / HS.aspect) / 2, hw, hw / HS.aspect, HS, samplePhoto(img, HS));
       }
