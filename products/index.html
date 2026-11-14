@@ -1320,8 +1320,10 @@ PD.CATALOGUE = {
   cushion: {
     name: 'Cushions', lead: 'sameday', blurb: 'Soft cushions printed with your photo, filled and ready.',
     items: [
-      { id: 'small', name: 'Small cushion', price: 15, tpl: 'cushion-small', variants: [['white', 'White', 7], ['pink', 'Pink', 12], ['blue', 'Blue', 9]] },
-      { id: 'large', name: 'Large cushion', price: 25, tpl: 'cushion-large', variants: [['white', 'White', 6], ['white-canvas', 'White canvas', 1], ['black', 'Black', 7], ['pink', 'Pink', 4], ['blue', 'Blue', 4]] },
+      // back: the front is white with the photo on it, and the colour is the back of the cushion (Arshan, 14 Nov 2026,
+      // who also took the white canvas large cushion off).
+      { id: 'small', name: 'Small cushion', price: 15, tpl: 'cushion-small', back: true, note: 'Your photo is printed on the white front. The colour is the back of the cushion.', variants: [['white', 'White', 7], ['pink', 'Pink', 12], ['blue', 'Blue', 9]] },
+      { id: 'large', name: 'Large cushion', price: 25, tpl: 'cushion-large', back: true, note: 'Your photo is printed on the white front. The colour is the back of the cushion.', variants: [['white', 'White', 6], ['black', 'Black', 7], ['pink', 'Pink', 4], ['blue', 'Blue', 4]] },
       { id: 'heart', name: 'Heart cushion', price: 25, tpl: 'cushion-heart', variants: [['white', 'White', 7]] },
       { id: 'sequin', name: 'Sequin cushion', price: 35, tpl: 'sequin-square', note: 'Brush the sequins one way to show your photo, the other way to hide it.', variants: [['black', 'Black sequins', 6], ['blue', 'Blue sequins', 4], ['red', 'Red sequins', 10], ['rose-gold', 'Rose gold sequins', 4]] },
       { id: 'sequin-heart', name: 'Heart sequin cushion, red', price: 35, tpl: 'sequin-heart', note: 'Brush the sequins one way to show your photo, the other way to hide it.', variants: [['red-heart', 'Red sequins', 9]] },
@@ -1336,9 +1338,11 @@ PD.CATALOGUE = {
         { id: 'jig-a4-60', name: 'A4 jigsaw, 60 pieces', price: 25, tpl: 'jigsaw-a4', pieces: [10, 6], stock: 2 },
         { id: 'jig-a3-150', name: 'A3 jigsaw, 150 pieces', price: 40, tpl: 'jigsaw-a3', pieces: [15, 10], stock: 4 }] },
       { id: 'keyring', name: 'Keyrings', items: [
-        { id: 'key-round', name: 'Round keyring', price: 9, tpl: 'keyring-round', stock: 17 },
-        { id: 'key-heart', name: 'Heart keyring', price: 9, tpl: 'keyring-heart', stock: 12 },
-        { id: 'key-alu', name: 'Aluminium keyring', price: 9, tpl: 'keyring-alu', stock: 71 },
+        // sides: 2 = printed on both sides, with the same photo or a different one on the back, at the same price
+        // (Arshan, 14 Nov 2026). The print file is then one sheet with both sides on it.
+        { id: 'key-round', name: 'Round keyring', price: 9, tpl: 'keyring-round', sides: 2, stock: 17 },
+        { id: 'key-heart', name: 'Heart keyring', price: 9, tpl: 'keyring-heart', sides: 2, stock: 12 },
+        { id: 'key-alu', name: 'Aluminium keyring', price: 9, tpl: 'keyring-alu', sides: 2, stock: 71 },
         { id: 'key-metal', name: 'Metal keyring', price: 12, tpl: 'keyring-metal', stock: 12 },
         { id: 'key-opener', name: 'Bottle opener keyring', price: 14, tpl: 'keyring-opener', stock: 4 }] },
       { id: 'magnet', name: 'Fridge magnets', items: [
@@ -1627,7 +1631,7 @@ PD.unitPrice = function (it) {
         g.save(); g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = 16; g.fillStyle = '#fff'; g.fillRect(W * 0.3, H * 0.08, W * 0.4, H * 0.84); g.restore();
         PD.drawCrop(g, img, 0, PD.cropRect(img, PD.newPlacement(img), 0.4 * W / (0.84 * H)), W * 0.3, H * 0.08, W * 0.4, H * 0.84);
       } else if (id === 'cushion') {
-        const G = PD.tpl('cushion-large'); drawCushion(g, W * 0.2, H * 0.1, W * 0.6, H * 0.8, G, samplePhoto(img, G), '#FFFFFF');
+        const G = PD.tpl('cushion-large'); drawCushion(g, W * 0.2, H * 0.1, W * 0.6, H * 0.8, G, samplePhoto(img, G), '#FFFFFF', { full: true });
       } else if (id === 'jigsaw') {
         const G = PD.tpl('jigsaw-a4', 'landscape'), w = W * 0.72;
         drawJigsaw(g, (W - w) / 2, (H - w / G.aspect) / 2, w, w / G.aspect, G, samplePhoto(img, G), [6, 5]);
@@ -1654,22 +1658,31 @@ PD.unitPrice = function (it) {
   const samplePhoto = (img, G) => ({ img, turn: 0, crop: PD.cropRect(img, PD.newPlacement(img), G.aspect) });
   const VARIANT_COLOURS = { pink: '#F7C9D6', blue: '#BFD7EE', black: '#2A2A2A', red: '#B3202A', 'rose-gold': '#E8C2B0', 'red-heart': '#B3202A' };
   const roundRect = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  let flat3d = false;   // true while a side is being drawn for the turning preview, which adds its own shadow
+  const shade = (g, blur, dy) => { if (flat3d) return; g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = blur; g.shadowOffsetY = dy; };
   function drawPhotoIn(g, G, photo, x, y, w, h) {
     if (!photo) return;
     g.save(); g.beginPath(); G.path(g, x, y, w, h); g.clip();
     PD.drawCrop(g, photo.img, photo.turn, faceCrop(G, photo.crop), x, y, w, h); g.restore();
   }
-  function drawCushion(g, x, y, w, h, G, photo, colour) {
+  // o.full: a small or large cushion, white on the front with the photo right across it; the colour is its back.
+  // o.back: the back of one of those, in its colour with nothing printed on it.
+  function drawCushion(g, x, y, w, h, G, photo, colour, o) {
+    o = o || {};
     const body = () => {
       g.beginPath();
       if (G.shaped) { G.path(g, x, y, w, h); return; }
-      const r = w * 0.14; g.moveTo(x + r, y); g.quadraticCurveTo(x + w / 2, y + h * 0.04, x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.quadraticCurveTo(x + w * 0.96, y + h / 2, x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.quadraticCurveTo(x + w / 2, y + h * 0.96, x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.quadraticCurveTo(x + w * 0.04, y + h / 2, x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+      // The sides curve in a little and the corners are round, except for the turning preview, where the
+      // cushion's own roundness does that (rounder corners there would leave a notch where front meets back).
+      const r = w * (flat3d ? 0.07 : 0.14), in_ = flat3d ? 0 : w * 0.04; g.moveTo(x + r, y); g.quadraticCurveTo(x + w / 2, y + h * 0.04, x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.quadraticCurveTo(x + w - in_, y + h / 2, x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.quadraticCurveTo(x + w / 2, y + h * 0.96, x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.quadraticCurveTo(x + in_, y + h / 2, x, y + r); g.quadraticCurveTo(x, y, x + r, y);
     };
-    g.save(); g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = Math.max(8, w * 0.05); g.shadowOffsetY = w * 0.02;
-    body(); g.fillStyle = colour || '#fff'; g.fill(); g.restore();
+    g.save(); shade(g, Math.max(8, w * 0.05), w * 0.02);
+    body(); g.fillStyle = o.full && !o.back ? '#FFFFFF' : colour || '#fff'; g.fill(); g.restore();
     g.save(); body(); g.clip();
-    const m = G.shaped ? 0.06 : 0.09;
-    drawPhotoIn(g, G, photo, x + w * m, y + h * m, w * (1 - 2 * m), h * (1 - 2 * m));
+    if (!o.back) {
+      const m = o.full ? (flat3d ? 0 : 0.015) : G.shaped ? 0.06 : 0.09;   // right to the seam when it turns, so no white band shows at the edge
+      drawPhotoIn(g, G, photo, x + w * m, y + h * m, w * (1 - 2 * m), h * (1 - 2 * m));
+    }
     const sh = g.createRadialGradient(x + w * 0.4, y + h * 0.35, w * 0.1, x + w / 2, y + h / 2, w * 0.75);
     sh.addColorStop(0, 'rgba(255,255,255,0.10)'); sh.addColorStop(1, 'rgba(0,0,0,0.22)');
     g.fillStyle = sh; g.fillRect(x, y, w, h);
@@ -1721,19 +1734,138 @@ PD.unitPrice = function (it) {
   // Magnets and keyrings: the face of the item, in its own shape.
   function drawFlat(g, x, y, w, h, G, photo) {
     const shape = () => { g.beginPath(); if (G.shaped) G.path(g, x, y, w, h); else roundRect(g, x, y, w, h, Math.min(w, h) * 0.05); };
-    g.save(); g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 16; g.shadowOffsetY = 6; shape(); g.fillStyle = '#FFFFFF'; g.fill(); g.restore();
+    g.save(); if (!flat3d) { g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 16; g.shadowOffsetY = 6; } shape(); g.fillStyle = '#FFFFFF'; g.fill(); g.restore();
     if (photo) { g.save(); shape(); g.clip(); PD.drawCrop(g, photo.img, photo.turn, faceCrop(G, photo.crop), x, y, w, h); g.restore(); }
     g.save(); shape(); g.lineWidth = Math.max(1, w / 260); g.strokeStyle = 'rgba(0,0,0,0.14)'; g.stroke(); g.restore();
+  }
+  // Polished metal, for the hardware of a keyring.
+  const silver = (g, x0, y0, x1, y1) => {
+    const s = g.createLinearGradient(x0, y0, x1, y1);
+    [[0, '#F6F7F8'], [0.2, '#CDD1D6'], [0.42, '#959BA2'], [0.6, '#ECEEF0'], [0.8, '#B9BEC4'], [1, '#858B92']].forEach(([p, c]) => s.addColorStop(p, c));
+    return s;
+  };
+  function splitRing(g, cx, cy, r, lw) {
+    g.save(); g.lineWidth = lw; g.strokeStyle = silver(g, cx - r, cy - r, cx + r, cy + r);
+    if (!flat3d) { g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 6; g.shadowOffsetY = 2; }
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); g.restore();
+    g.save(); g.lineWidth = Math.max(1, lw * 0.3); g.strokeStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(cx, cy, r, Math.PI * 1.1, Math.PI * 1.6); g.stroke(); g.restore();
   }
   // A keyring: the item on a split ring. The ring sits at the middle of the top (a heart dips there).
   function drawKeyring(g, x, y, w, h, G, photo) {
     const p = G.T.path; let top = 0;
     if (p && !G.turned) { top = 1; for (let i = 0; i < p.length; i += 2) if (Math.abs(p[i] / 1e5 - 0.5) < 0.04) top = Math.min(top, p[i + 1] / 1e5); if (top === 1) top = 0; }
     const r = Math.min(w, h) * 0.17, cx = x + w / 2, cy = y + top * h - r * 0.62;
-    g.save(); g.lineWidth = Math.max(2, r * 0.2); g.strokeStyle = '#A9ADB3'; g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
-    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); g.restore();
-    g.save(); g.lineWidth = Math.max(1, r * 0.07); g.strokeStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.arc(cx, cy, r, Math.PI * 1.1, Math.PI * 1.6); g.stroke(); g.restore();
+    splitRing(g, cx, cy, r, Math.max(2, r * 0.2));
     drawFlat(g, x, y, w, h, G, photo);
+  }
+  /* The metal keyring and the bottle opener keyring, drawn as the real things (Arshan's photos, 14 Nov 2026): the
+     picture sits in polished metal on a split ring. box is the space to draw in; the keyring is made as big as fits.
+     A landscape picture turns the whole keyring on its side with the ring to the right, the way the print goes on
+     (the top of the picture is at the left of the sheet). Sizes below are in widths of the picture, on the keyring
+     upright: side, top and bottom are the room the metal and the ring take up round the picture. */
+  const HARD_KEYRING = { 'key-metal': { side: 0.24, top: 1.64, bottom: 0.2 }, 'key-opener': { side: 0.27, top: 1.56, bottom: 1.12 } };
+  function drawHardKeyring(g, box, G, photo, id) {
+    const K = HARD_KEYRING[id], fa = G.turned ? 1 / G.aspect : G.aspect;      // the picture upright on the keyring: width / height
+    const tw = 1 + 2 * K.side, th = 1 / fa + K.top + K.bottom;                 // the whole keyring, in picture widths
+    const fw = G.turned ? Math.min(box.w / th, box.h / tw) : Math.min(box.w / tw, box.h / th), fh = fw / fa;
+    const cx = box.x + box.w / 2, cy = box.y + box.h / 2, fx = -fw / 2, fy = -th * fw / 2 + K.top * fw;
+    const onKeyring = fn => { g.save(); g.translate(cx, cy); if (G.turned) g.rotate(Math.PI / 2); fn(); g.restore(); };
+    const metal = (x0, y0, x1, y1, blur) => { g.fillStyle = silver(g, x0, y0, x1, y1); if (blur && !flat3d) { g.shadowColor = 'rgba(0,0,0,.26)'; g.shadowBlur = blur; g.shadowOffsetY = blur * 0.35; } };
+    const edge = () => { g.lineWidth = Math.max(1, fw * 0.012); g.strokeStyle = 'rgba(40,44,50,.38)'; g.stroke(); };
+    let window_;   // the outline the picture shows through
+    onKeyring(() => {
+      if (id === 'key-metal') {
+        // a frame with straight sides and bowed ends, on a small loop
+        const b = fw * 0.09, bow = fh * 0.03, top = fy - b * 1.6, lh = fw * 0.2, lw = fw * 0.3, ltop = top - lh * 0.8, R = fw * 0.66;
+        const barrel = (x, y, w, h, d) => { g.moveTo(x, y + d); g.quadraticCurveTo(x + w / 2, y - d, x + w, y + d); g.lineTo(x + w, y + h - d); g.quadraticCurveTo(x + w / 2, y + h + d, x, y + h - d); g.closePath(); };
+        window_ = () => barrel(fx, fy, fw, fh, bow);
+        splitRing(g, 0, ltop + lh * 0.42 - R, R, fw * 0.09);
+        g.save(); g.beginPath(); roundRect(g, -lw / 2, ltop, lw, lh, lh * 0.22); metal(-lw / 2, ltop, lw / 2, ltop + lh, fw * 0.04); g.fill(); g.restore();
+        g.save(); g.beginPath(); roundRect(g, -lw / 2, ltop, lw, lh, lh * 0.22); edge(); g.restore();
+        g.save(); g.lineJoin = 'round'; g.beginPath(); barrel(fx - b, top, fw + 2 * b, fh + b * 3.2, bow * 2.2); metal(fx - b, top, fx + fw + b, top + fh + b * 3.2, fw * 0.1); g.fill(); g.restore();
+        g.save(); g.lineJoin = 'round'; g.beginPath(); barrel(fx - b, top, fw + 2 * b, fh + b * 3.2, bow * 2.2); edge(); g.restore();
+        g.save(); g.lineJoin = 'round'; g.beginPath(); barrel(fx - b * 0.55, top + b * 0.5, fw + b * 1.1, fh + b * 2.2, bow * 1.8); g.lineWidth = Math.max(1, fw * 0.014); g.strokeStyle = 'rgba(255,255,255,.7)'; g.stroke(); g.restore();
+      } else {
+        // a bottle opener: the picture in the top half, the opening below it
+        const top = fy - fw * 0.18, hu = fw * 0.57, hl = fw * 0.74, rc = fw * 0.13, yA = fy + fh * 0.75, yB = fy + fh + fw * 0.45, bot = fy + fh + fw * 1.07;
+        const hy = fy + fh + fw * 0.61, hrx = fw * 0.52, hry = fw * 0.37, R = fw * 0.62, jy = top - fw * 0.07;
+        const body = () => {
+          g.moveTo(-hu + rc, top); g.lineTo(hu - rc, top); g.quadraticCurveTo(hu, top, hu, top + rc); g.lineTo(hu, yA);
+          g.bezierCurveTo(hu, yA + (yB - yA) * 0.55, hl, yA + (yB - yA) * 0.45, hl, yB);
+          g.bezierCurveTo(hl, yB + (bot - yB) * 0.62, hl * 0.62, bot, 0, bot);
+          g.bezierCurveTo(-hl * 0.62, bot, -hl, yB + (bot - yB) * 0.62, -hl, yB);
+          g.bezierCurveTo(-hl, yA + (yB - yA) * 0.45, -hu, yA + (yB - yA) * 0.55, -hu, yA);
+          g.lineTo(-hu, top + rc); g.quadraticCurveTo(-hu, top, -hu + rc, top); g.closePath();
+        };
+        const hole = () => { g.moveTo(hrx, hy); g.ellipse(0, hy, hrx, hry, 0, 0, Math.PI * 2); };
+        window_ = () => roundRect(g, fx, fy, fw, fh, fw * 0.025);
+        splitRing(g, 0, jy - R, R, fw * 0.085);
+        g.save(); g.beginPath(); g.arc(0, jy, fw * 0.09, 0, Math.PI * 2); metal(-fw * 0.09, jy - fw * 0.09, fw * 0.09, jy + fw * 0.09, fw * 0.04); g.fill(); g.restore();
+        g.save(); g.beginPath(); body(); hole(); metal(-hl, top, hl, bot, fw * 0.1); g.fill('evenodd'); g.restore();
+        g.save(); g.beginPath(); body(); edge(); g.restore();
+        g.save(); g.beginPath(); hole(); edge(); g.restore();
+        // the lip that catches the bottle top
+        g.save(); g.beginPath(); roundRect(g, -fw * 0.11, hy - hry - fw * 0.02, fw * 0.22, fw * 0.1, fw * 0.035); metal(-fw * 0.11, hy - hry, fw * 0.11, hy - hry + fw * 0.1, 0); g.fill(); g.restore();
+      }
+      g.beginPath(); window_();   // left as the current path for the picture, below
+    });
+    // The picture, upright, in the window (a turned keyring's window is the same shape, on its side).
+    const yc = fy + fh / 2, ux = G.turned ? cx - yc - fh / 2 : cx + fx, uy = G.turned ? cy - fw / 2 : cy + fy, uw = G.turned ? fh : fw, uh = G.turned ? fw : fh;
+    g.save(); g.clip(); g.fillStyle = '#FFFFFF'; g.fillRect(ux - 2, uy - 2, uw + 4, uh + 4);
+    if (photo) PD.drawCrop(g, photo.img, photo.turn, faceCrop(G, photo.crop), ux, uy, uw, uh);
+    g.restore();
+    onKeyring(() => { g.beginPath(); window_(); g.lineWidth = Math.max(1, fw * 0.014); g.strokeStyle = 'rgba(30,34,40,.35)'; g.stroke(); });
+  }
+  /* A turning preview for things with two sides (a cushion with a coloured back, a double-sided keyring). Each side
+     is drawn flat; the canvas then shows them as one solid thing turning about its upright middle, like the mug:
+     drag it to turn it, or let it turn by itself. scene = { front, back: canvases the size of cv, cx, cy: the
+     middle of the thing, half: half its width, plump: its depth as a share of its width, caption }. */
+  function Turner(cv, tools) {
+    const spin = el('button', { type: 'button', class: 'chip small' }, 'Stop turning');
+    tools.append(spin);
+    const self = { angle: 0.45, auto: true, scene: null };
+    let drag = null, last = 0, raf = 0, tmp = null;
+    function render() {
+      const S = self.scene; if (!S) return;
+      const W = cv.width, H = cv.height, g = PD.ctx(cv);
+      if (!tmp || tmp.width !== W || tmp.height !== H) tmp = PD.canvas(W, H);
+      const t = PD.ctx(tmp); t.clearRect(0, 0, W, H);
+      // A solid with an oval cross-section, a wide and c deep, seen from the front after turning by th. Its seam
+      // (where front meets back) is the widest part; phi runs round the cross-section, 0 to PI on the front.
+      const a = S.half, c = Math.max(1, a * S.plump), th = self.angle, fat = S.plump > 0.1;
+      const A = Math.sqrt(Math.pow(a * Math.cos(th), 2) + Math.pow(c * Math.sin(th), 2)), p0 = Math.atan2(c * Math.sin(th), a * Math.cos(th));
+      const step = Math.max(1, Math.round(W / 480));
+      for (let px = -A; px < A; px += step) {
+        const psi = Math.acos(PD.clamp((px + step / 2) / A, -1, 1)), phi = p0 + psi, u = Math.cos(phi), front = Math.sin(phi) >= 0;
+        const z = (-a * u * Math.sin(th) + c * Math.sin(phi) * Math.cos(th)) / a;   // how near this strip is, -1 to 1
+        const s = 1 + 0.1 * z, sx = PD.clamp(Math.round(S.cx + (front ? u : -u) * a), 0, W - 1);
+        t.globalCompositeOperation = 'source-over';
+        t.drawImage(front ? S.front : S.back, sx, 0, 1, H, S.cx + px, S.cy - S.cy * s, step + 0.6, H * s);
+        const dark = (fat ? 0.3 * Math.pow(1 - Math.sin(psi), 2) : 0) + (fat ? 0.08 : 0.24) * (1 - Math.abs(Math.cos(th)));
+        if (dark > 0.01) { t.globalCompositeOperation = 'source-atop'; t.fillStyle = 'rgba(0,0,0,' + dark.toFixed(3) + ')'; t.fillRect(S.cx + px, 0, step + 0.6, H); }
+      }
+      t.globalCompositeOperation = 'source-over';
+      g.fillStyle = '#F3EFE8'; g.fillRect(0, 0, W, H);
+      g.save(); g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = W * 0.03; g.shadowOffsetY = W * 0.012; g.drawImage(tmp, 0, 0); g.restore();
+      if (S.caption) { g.fillStyle = '#8A8F88'; g.font = '600 ' + (W / 30) + 'px Montserrat, sans-serif'; g.textAlign = 'center'; g.fillText(S.caption, W / 2, H - 14); }
+    }
+    function loop(ts) {
+      if (!cv.isConnected || !self.scene) { raf = 0; return; }   // the customer has gone to another screen
+      if (self.auto && !drag) { const dt = last ? Math.min(50, ts - last) : 16; self.angle += dt * 0.0008; }
+      last = ts; render();
+      raf = self.auto || drag ? requestAnimationFrame(loop) : 0;
+    }
+    function kick() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } }
+    cv.addEventListener('pointerdown', e => { if (!self.scene) return; cv.setPointerCapture(e.pointerId); drag = { x: e.clientX, a: self.angle }; kick(); });
+    cv.addEventListener('pointermove', e => { if (drag) { self.angle = drag.a - (e.clientX - drag.x) / (cv.clientWidth * 0.3); render(); } });
+    const up = () => { drag = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    spin.addEventListener('click', () => { self.auto = !self.auto; spin.textContent = self.auto ? 'Stop turning' : 'Turn it round'; kick(); render(); });
+    self.show = scene => { self.scene = scene; render(); kick(); };
+    self.hide = () => { self.scene = null; };
+    self.setAngle = a => { self.angle = a; render(); };
+    self.stop = () => { self.auto = false; spin.textContent = 'Turn it round'; };
+    return self;
   }
 
   /* ---------- product screens ---------- */
@@ -2135,20 +2267,28 @@ PD.unitPrice = function (it) {
     const iOff = i => (isCushion ? i.variants.every(v => vOff(i, v)) : sold('gift:' + i.id));
     const firstVariant = i => (i.variants ? (i.variants.find(v => !vOff(i, v)) || i.variants[0])[0] : '');
     const first = all.find(i => !iOff(i)) || all[0];
-    const st = { group: isCushion ? 'cushion' : group, item: first.id, variant: firstVariant(first), orient: '', qty: 1 };
+    const st = { group: isCushion ? 'cushion' : group, item: first.id, variant: firstVariant(first), orient: '', back: 'same', qty: 1 };
     const S = shell(kind, isCushion ? 'Photo cushion' : { jigsaw: 'Photo jigsaw', keyring: 'Photo keyring', magnet: 'Fridge magnet', slate: 'Photo slate' }[group] || 'Photo gift');
     const itemOf = () => all.find(i => i.id === st.item);
     const geo = () => PD.tpl(itemOf().tpl, st.orient);
     const thing = () => (isCushion ? 'cushion' : { jigsaw: 'jigsaw', keyring: 'keyring', magnet: 'magnet', slate: 'slate' }[itemOf().group] || 'gift');
-    const quality = qualityBox(), mock = el('canvas'), preview = el('div', { class: 'preview' }, mock, quality);
+    // Printed on both sides (the round, heart and aluminium keyrings): the same photo twice, or another on the back.
+    const twoSided = () => itemOf().sides === 2;
+    // Shown turning round, like the mug: a cushion with a coloured back, and anything printed on both sides.
+    const turns = () => !!itemOf().back || twoSided();
+    const quality = qualityBox(), mock = el('canvas'), turnTools = el('div', { class: 'mug3d-tools', hidden: true });
+    const turnHint = el('p', { class: 'hint', hidden: true }), preview = el('div', { class: 'preview' }, mock, turnTools, turnHint, quality);
+    const turner = Turner(mock, turnTools);
     const item = { update: () => refresh() }, add = addBar(st, item, addToBasket);
     const itemArea = el('div'), variantArea = el('div'), photoArea = el('div'), noteP = el('p', { class: 'hint' });
-    let editor = null, photo = null, orientChips = null;
+    let editor = null, photo = null, orientChips = null, editorB = null, photoB = null, still = null;
     S.left.append(step(1, isCushion ? 'Cushion' : { jigsaw: 'Jigsaw', keyring: 'Keyring', magnet: 'Magnet', slate: 'Slate' }[group] || 'Gift', itemArea, variantArea, noteP), step(2, 'Your photo', photoArea), el('div', { class: 'step' }, add.bar));
     S.side.append(preview); placeSide(S, 2);
     // Which way up the picture goes on items that can go either way: the way the photo is, until the customer chooses.
     const photoWay = () => (photo && PD.imgW(photo.img) < PD.imgH(photo.img) ? 'portrait' : 'landscape');
     function pickWay() { const it = itemOf(); st.orient = PD.tplTurns(it.tpl) ? (photo ? photoWay() : PD.tpl(it.tpl).orient) : ''; }
+    // Both photo boxes follow the way up that was chosen.
+    function reshape() { const g2 = geo(); [editor, editorB].forEach(e => e && e.setOpts({ aspect: g2.aspect, guide: g2.safe })); }
     function buildItems() {
       itemArea.innerHTML = '';
       const list = all.filter(i => i.group === st.group);
@@ -2157,24 +2297,26 @@ PD.unitPrice = function (it) {
     }
     function buildVariants() {
       variantArea.innerHTML = ''; const it = itemOf(), G = PD.tpl(it.tpl);
-      if (it.variants && it.variants.length > 1) variantArea.append(sub('Colour'), chips(it.variants.map(v => ({ v: v[0], label: v[1], small: vOff(it, v) ? 'Sold out' : null, disabled: vOff(it, v) })), st.variant, v => { st.variant = v; refresh(); }));
+      if (it.variants && it.variants.length > 1) variantArea.append(sub(it.back ? 'Colour of the back' : 'Colour'), chips(it.variants.map(v => ({ v: v[0], label: v[1], small: vOff(it, v) ? 'Sold out' : null, disabled: vOff(it, v) })), st.variant, v => { st.variant = v; refresh(); }));
       const a = Math.max(G.faceMm.w, G.faceMm.h), b = Math.min(G.faceMm.w, G.faceMm.h);
-      noteP.textContent = [it.note, it.groupNote, 'The printed area is about ' + PD.sizeText(a, b) + '.'].filter(Boolean).join(' ');
+      noteP.textContent = [it.note, it.sides === 2 ? 'Printed on both sides: the same photo on each side, or a different one on the back, for the same price.' : '',
+        it.groupNote, 'The printed area is about ' + PD.sizeText(a, b) + '.'].filter(Boolean).join(' ');
     }
     function buildPhoto() {
-      const it = itemOf(); photoArea.innerHTML = ''; editor = null; orientChips = null;
+      const it = itemOf(), two = twoSided(); photoArea.innerHTML = ''; editor = null; editorB = null; orientChips = null;
       pickWay();
       const G = geo(), holder = el('div');
       const addBtn = el('button', { type: 'button', class: 'addphoto' }, photo ? 'Change photo' : '+ Add your photo');
       addBtn.addEventListener('click', async () => {
         const [p] = await pickPhotos(false); if (!p) return;
         photo = p; addBtn.textContent = 'Change photo';
-        if (PD.tplTurns(it.tpl) && st.orient !== photoWay()) { st.orient = photoWay(); orientChips.set(st.orient); const g2 = geo(); editor.setOpts({ aspect: g2.aspect, guide: g2.safe }); }
+        if (PD.tplTurns(it.tpl) && st.orient !== photoWay()) { st.orient = photoWay(); orientChips.set(st.orient); reshape(); }
         editor.set(p.img);
       });
+      if (two) photoArea.append(sub('The front'));
       photoArea.append(addBtn);
       if (PD.tplTurns(it.tpl)) {
-        orientChips = chips([{ v: 'portrait', label: 'Portrait' }, { v: 'landscape', label: 'Landscape' }], st.orient, v => { st.orient = v; const g2 = geo(); editor.setOpts({ aspect: g2.aspect, guide: g2.safe }); refresh(); });
+        orientChips = chips([{ v: 'portrait', label: 'Portrait' }, { v: 'landscape', label: 'Landscape' }], st.orient, v => { st.orient = v; reshape(); refresh(); });
         photoArea.append(sub('Which way up'), orientChips);
       }
       photoArea.append(holder, el('p', { class: 'hint' }, G.safe
@@ -2182,8 +2324,27 @@ PD.unitPrice = function (it) {
         : G.shaped ? 'Your photo is cut to this shape. Drag it and zoom to get it how you want.' : 'Drag your photo and zoom to get it how you want.'));
       editor = PD.Editor(holder, { aspect: G.aspect, path: G.shaped ? G.path : null, guide: G.safe, onChange: () => refresh() });
       if (photo) editor.set(photo.img);
+      if (two) {
+        // The other side: the same photo again, or one of its own.
+        const backArea = el('div');
+        const buildBack = () => {
+          backArea.innerHTML = ''; editorB = null;
+          if (st.back !== 'other') return;
+          const g2 = geo(), holderB = el('div');
+          const addB = el('button', { type: 'button', class: 'addphoto' }, photoB ? 'Change photo' : '+ Add the photo for the back');
+          addB.addEventListener('click', async () => { const [p] = await pickPhotos(false); if (!p) return; photoB = p; addB.textContent = 'Change photo'; editorB.set(p.img); });
+          backArea.append(addB, holderB);
+          editorB = PD.Editor(holderB, { aspect: g2.aspect, path: g2.shaped ? g2.path : null, guide: g2.safe, onChange: () => refresh() });
+          if (photoB) editorB.set(photoB.img);
+        };
+        photoArea.append(sub('The back'), chips([{ v: 'same', label: 'The same photo' }, { v: 'other', label: 'A different photo' }], st.back, v => { st.back = v; buildBack(); refresh(); }), backArea);
+        buildBack();
+      }
       refresh();
     }
+    // The photo as it is placed in a photo box, or null.
+    const placed = e => (e && e.img ? { img: e.img, turn: e.pl.turn, crop: e.crop() } : null);
+    const backOf = ph => (st.back === 'other' ? placed(editorB) : ph);   // what goes on the back of a two-sided item
     const drawMock = debounce(() => {
       const it = itemOf(), G = geo(), W = Math.min(720, Math.max(320, (S.side.clientWidth || 360) * 1.6)), H = Math.round(W * 0.8);
       mock.width = W; mock.height = H; mock.style.width = '100%';
@@ -2191,46 +2352,83 @@ PD.unitPrice = function (it) {
       // Bigger things are drawn bigger, so a keyring doesn't look the size of a cushion.
       const big = 0.5 + 0.5 * Math.min(1, Math.max(G.faceMm.w, G.faceMm.h) / 250);
       const a = G.faceMm.w / G.faceMm.h, bw = Math.min(W * 0.76, H * 0.8 * a) * big, bh = bw / a, x = (W - bw) / 2, y = (H - bh) / 2;
-      const ph = editor && editor.img ? { img: editor.img, turn: editor.pl.turn, crop: editor.crop() } : null;
-      if (isCushion) {
-        const v = it.variants.find(z => z[0] === st.variant) || it.variants[0];
-        drawCushion(g, x, y, bw, bh, G, ph, VARIANT_COLOURS[v[0]] || '#FFFFFF');
-      } else if (it.group === 'slate') drawSlate(g, x, y, bw, bh, G, ph);
-      else if (it.group === 'jigsaw') drawJigsaw(g, x, y, bw, bh, G, ph, it.pieces);
-      else if (it.group === 'keyring') drawKeyring(g, x, y + Math.min(bw, bh) * 0.12, bw, bh, G, ph);
-      else drawFlat(g, x, y, bw, bh, G, ph);
-      if (!ph) { g.fillStyle = '#8A8F88'; g.font = '600 ' + (W / 30) + 'px Montserrat, sans-serif'; g.textAlign = 'center'; g.fillText('Add a photo to see it', W / 2, H - 14); }
-      quality.set(ph ? { ppi: ph.crop.w / G.winIn.w } : null);
+      const ph = placed(editor), phB = twoSided() ? backOf(ph) : null;
+      const caption = ph ? '' : 'Add a photo to see it';
+      const spins = turns();
+      mock.classList.toggle('mug3d', spins); turnTools.hidden = !spins; turnHint.hidden = !spins;
+      if (spins) {
+        // Each side drawn flat on its own, for the turning preview.
+        const ky = y + Math.min(bw, bh) * 0.12;
+        const side = back => {
+          const c = PD.canvas(W, H), q = PD.ctx(c); flat3d = true;
+          try {
+            if (isCushion) drawCushion(q, x, y, bw, bh, G, ph, VARIANT_COLOURS[st.variant] || '#FFFFFF', { full: true, back });
+            else drawKeyring(q, x, ky, bw, bh, G, back ? phB : ph);
+          } finally { flat3d = false; }
+          return c;
+        };
+        const front = side(false);
+        still = PD.canvas(W, H); const sg = PD.ctx(still); sg.fillStyle = '#F3EFE8'; sg.fillRect(0, 0, W, H); sg.drawImage(front, 0, 0);
+        turnHint.textContent = isCushion ? 'Drag the cushion to turn it and see the back.' : 'Drag the keyring to turn it and see the other side.';
+        turner.show({ front, back: side(true), cx: W / 2, cy: (isCushion ? y : ky) + bh / 2, half: bw / 2, plump: isCushion ? 0.24 : 0.035, caption });
+      } else {
+        turner.hide(); still = null;
+        if (isCushion) {
+          const v = it.variants.find(z => z[0] === st.variant) || it.variants[0];
+          drawCushion(g, x, y, bw, bh, G, ph, VARIANT_COLOURS[v[0]] || '#FFFFFF');
+        } else if (it.group === 'slate') drawSlate(g, x, y, bw, bh, G, ph);
+        else if (it.group === 'jigsaw') drawJigsaw(g, x, y, bw, bh, G, ph, it.pieces);
+        else if (HARD_KEYRING[it.id]) drawHardKeyring(g, { x: W * 0.06, y: H * 0.05, w: W * 0.88, h: H * 0.86 }, G, ph, it.id);
+        else if (it.group === 'keyring') drawKeyring(g, x, y + Math.min(bw, bh) * 0.12, bw, bh, G, ph);
+        else drawFlat(g, x, y, bw, bh, G, ph);
+        if (caption) { g.fillStyle = '#8A8F88'; g.font = '600 ' + (W / 30) + 'px Montserrat, sans-serif'; g.textAlign = 'center'; g.fillText(caption, W / 2, H - 14); }
+      }
+      const ppis = [ph, twoSided() && st.back === 'other' ? phB : null].filter(Boolean).map(p => p.crop.w / G.winIn.w);
+      quality.set(ppis.length ? { ppi: Math.min(...ppis) } : null);
     }, 120);
     function refresh() { const it = itemOf(); S.price.textContent = PD.money(it.price * st.qty); add.btn.textContent = 'Add to basket · ' + PD.money(it.price * st.qty); drawMock(); }
     function addToBasket() {
-      const it = itemOf();
-      if (!(editor && editor.img)) { alert('Add your photo first.'); return; }
-      const keep = { img: editor.img, turn: editor.pl.turn, crop: editor.crop(), orient: st.orient };
+      const it = itemOf(), two = twoSided(), other = two && st.back === 'other';
+      if (!(editor && editor.img)) { alert(two ? 'Add your photo for the front first.' : 'Add your photo first.'); return; }
+      if (other && !(editorB && editorB.img)) { alert('Add the photo for the back, or choose "The same photo".'); return; }
+      const keep = Object.assign(placed(editor), { orient: st.orient }), keepB = other ? placed(editorB) : keep;
       const variant = it.variants ? (it.variants.find(v => v[0] === st.variant) || it.variants[0]) : null;
       const G = geo(), T = G.T, tplName = T.file.replace(/\.psd$/, '').replace(/ - Template/, '');
       const way = PD.tplTurns(it.tpl) ? (st.orient === 'portrait' ? 'Portrait' : 'Landscape') : '';
+      const sides = two ? (other ? 'Double-sided, a different photo on each side' : 'Double-sided, the same photo on both sides') : '';
       basketAdd({
         product: kind, item: it.id, variant: variant ? variant[0] : '', qty: st.qty, unit: it.price, lead: 'sameday',
-        title: it.name, desc: [variant && it.variants.length > 1 ? variant[1] : '', way].filter(Boolean).join(', '), thumb: thumbFrom(mock, 240),
-        settings: { item: it.id, variant: variant ? variant[0] : '', template: it.tpl, templateFile: T.file, orient: st.orient, turned: G.turned },
+        title: it.name, desc: [variant && it.variants.length > 1 ? variant[1] + (it.back ? ' back' : '') : '', way, sides].filter(Boolean).join(', '), thumb: thumbFrom(turns() && still ? still : mock, 240),
+        settings: { item: it.id, variant: variant ? variant[0] : '', template: it.tpl, templateFile: T.file, orient: st.orient, turned: G.turned, sides: two ? (other ? 'different' : 'same') : '' },
         make: async () => {
-          const wIn = T.w / T.dpi, hIn = T.h / T.dpi, ppi = keep.crop.w / G.winIn.w, dpi = printDpi(ppi, wIn, hIn, 16);
-          const draw = (g, w, h) => PD.drawCrop(g, keep.img, keep.turn, keep.crop, 0, 0, w, h);
-          const sheet = PD.tplSheet(G, dpi, draw), jpeg = PD.jpegAtDpi(await PD.toJpegBytes(sheet, 0.95), dpi); PD.free(sheet);   // 14 Nov 2026: a JPEG, not a PDF
-          const small = PD.tplSheet(G, Math.min(dpi, 600 / Math.max(wIn, hIn)), draw);      // the little picture of the sheet
-          const prev = PD.canvas(600 * Math.min(1, wIn / hIn), 600 * Math.min(1, hIn / wIn)); PD.ctx(prev).drawImage(small, 0, 0, prev.width, prev.height); PD.free(small);
-          const mm = (G.sheetMm.w.toFixed(1) + ' x ' + G.sheetMm.h.toFixed(1)).replace(/\.0/g, '') + ' mm';
+          const wIn = T.w / T.dpi, hIn = T.h / T.dpi, ppiOf = k => k.crop.w / G.winIn.w, ppi = Math.min(ppiOf(keep), ppiOf(keepB));
+          const dpi = printDpi(Math.max(ppiOf(keep), ppiOf(keepB)), wIn * (two ? 2 : 1), hIn, 16);
+          const draw = k => (g, w, h) => PD.drawCrop(g, k.img, k.turn, k.crop, 0, 0, w, h);
+          // A double-sided keyring is one sheet with the template on it twice: the front on the left and the back on
+          // the right, 10 mm apart, each at its exact size. Plain white between them: nothing is drawn there.
+          const sheetAt = d => {
+            const f = PD.tplSheet(G, d, draw(keep));
+            if (!two) return f;
+            const b = PD.tplSheet(G, d, draw(keepB)), gap = Math.round(d * 10 / 25.4), c = PD.canvas(f.width * 2 + gap, f.height), q = PD.ctx(c);
+            q.fillStyle = '#FFFFFF'; q.fillRect(0, 0, c.width, c.height); q.drawImage(f, 0, 0); q.drawImage(b, f.width + gap, 0); PD.free(f); PD.free(b);
+            return c;
+          };
+          const sheet = sheetAt(dpi), jpeg = PD.jpegAtDpi(await PD.toJpegBytes(sheet, 0.95), dpi); PD.free(sheet);   // 14 Nov 2026: a JPEG, not a PDF
+          const wMm = two ? G.sheetMm.w * 2 + 10 : G.sheetMm.w, hMm = G.sheetMm.h;
+          const small = sheetAt(Math.min(dpi, 600 / Math.max(wMm, hMm) * 25.4));          // the little picture of the sheet
+          const prev = PD.canvas(600 * Math.min(1, wMm / hMm), 600 * Math.min(1, hMm / wMm)); PD.ctx(prev).drawImage(small, 0, 0, prev.width, prev.height); PD.free(small);
+          const mm = (wMm.toFixed(1) + ' x ' + hMm.toFixed(1)).replace(/\.0/g, '') + ' mm';
           return {
-            files: [{ name: slug(it.id + (variant ? ' ' + variant[0] : '') + (way ? ' ' + way.toLowerCase() : '') + ' - ' + tplName) + '.jpg', mime: 'image/jpeg', bytes: jpeg }],
+            files: [{ name: slug(it.id + (variant ? ' ' + variant[0] : '') + (way ? ' ' + way.toLowerCase() : '') + (two ? ' both sides' : '') + ' - ' + tplName) + '.jpg', mime: 'image/jpeg', bytes: jpeg }],
             preview: prev, ppi,
-            note: 'Shop template: ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Top of the picture is at the LEFT of the sheet' : ''),
+            note: two ? 'BOTH SIDES, one sheet: front left, back right. ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Tops at LEFT' : '')
+              : 'Shop template: ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Top of the picture is at the LEFT of the sheet' : ''),
           };
         },
       });
     }
     buildItems();
-    return { st };
+    return { st, turner };
   }
 
   /* ---------- basket ---------- */
@@ -2497,7 +2695,7 @@ PD.unitPrice = function (it) {
   if (TEST) { $('#testbar').hidden = false; $('#testbar .wrap').append(' ', el('a', { href: '#shop' }, 'Shop mode (the MyMo replacement)'), ' · ', el('a', { href: '#' }, 'Customer version')); }
   // Fonts for the designs: redraw once they are in.
   if (document.fonts && document.fonts.load) Promise.all(['400 16px Pacifico', '600 16px Fredoka', '600 16px Montserrat', '400 16px "Luckiest Guy"', '700 16px "Mountains of Christmas"', '400 16px "Great Vibes"'].map(f => document.fonts.load(f).catch(() => {}))).then(() => { PD.fontsReady = true; window.dispatchEvent(new Event('pd-fonts')); });
-  window.PD_APP = { basket, open, drawCushion };   // drawCushion: for making the Order online page's picture
+  window.PD_APP = { basket, open, drawCushion, screen: () => current };   // drawCushion: for making the Order online page's picture
   const q = new URLSearchParams(location.search);
   if (!TEST && !SHOP && (q.get('paid') || q.get('unpaid'))) backFromStripe(q);
   else if (TEST || SHOP || !resume()) open(SHOP ? 'canvas' : location.hash.slice(1));
