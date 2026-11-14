@@ -1339,7 +1339,8 @@ PD.CATALOGUE = {
         { id: 'jig-a3-150', name: 'A3 jigsaw, 150 pieces', price: 40, tpl: 'jigsaw-a3', pieces: [15, 10], stock: 4 }] },
       { id: 'keyring', name: 'Keyrings', items: [
         // sides: 2 = printed on both sides, with the same photo or a different one on the back, at the same price
-        // (Arshan, 14 Nov 2026). The print file is then one sheet with both sides on it.
+        // (Arshan, 14 Nov 2026). There are then two print files, the front and the back; the product orders script
+        // names them so it is plain which two go on the same keyring.
         { id: 'key-round', name: 'Round keyring', price: 9, tpl: 'keyring-round', sides: 2, stock: 17 },
         { id: 'key-heart', name: 'Heart keyring', price: 9, tpl: 'keyring-heart', sides: 2, stock: 12 },
         { id: 'key-alu', name: 'Aluminium keyring', price: 9, tpl: 'keyring-alu', sides: 2, stock: 71 },
@@ -2397,32 +2398,24 @@ PD.unitPrice = function (it) {
       const way = PD.tplTurns(it.tpl) ? (st.orient === 'portrait' ? 'Portrait' : 'Landscape') : '';
       const sides = two ? (other ? 'Double-sided, a different photo on each side' : 'Double-sided, the same photo on both sides') : '';
       basketAdd({
-        product: kind, item: it.id, variant: variant ? variant[0] : '', qty: st.qty, unit: it.price, lead: 'sameday',
+        product: kind, item: it.id, variant: variant ? variant[0] : '', qty: st.qty, unit: it.price, lead: 'sameday', files: two ? 2 : 1,
         title: it.name, desc: [variant && it.variants.length > 1 ? variant[1] + (it.back ? ' back' : '') : '', way, sides].filter(Boolean).join(', '), thumb: thumbFrom(turns() && still ? still : mock, 240),
         settings: { item: it.id, variant: variant ? variant[0] : '', template: it.tpl, templateFile: T.file, orient: st.orient, turned: G.turned, sides: two ? (other ? 'different' : 'same') : '' },
         make: async () => {
           const wIn = T.w / T.dpi, hIn = T.h / T.dpi, ppiOf = k => k.crop.w / G.winIn.w, ppi = Math.min(ppiOf(keep), ppiOf(keepB));
-          const dpi = printDpi(Math.max(ppiOf(keep), ppiOf(keepB)), wIn * (two ? 2 : 1), hIn, 16);
+          const dpi = printDpi(Math.max(ppiOf(keep), ppiOf(keepB)), wIn, hIn, 16);
           const draw = k => (g, w, h) => PD.drawCrop(g, k.img, k.turn, k.crop, 0, 0, w, h);
-          // A double-sided keyring is one sheet with the template on it twice: the front on the left and the back on
-          // the right, 10 mm apart, each at its exact size. Plain white between them: nothing is drawn there.
-          const sheetAt = d => {
-            const f = PD.tplSheet(G, d, draw(keep));
-            if (!two) return f;
-            const b = PD.tplSheet(G, d, draw(keepB)), gap = Math.round(d * 10 / 25.4), c = PD.canvas(f.width * 2 + gap, f.height), q = PD.ctx(c);
-            q.fillStyle = '#FFFFFF'; q.fillRect(0, 0, c.width, c.height); q.drawImage(f, 0, 0); q.drawImage(b, f.width + gap, 0); PD.free(f); PD.free(b);
-            return c;
-          };
-          const sheet = sheetAt(dpi), jpeg = PD.jpegAtDpi(await PD.toJpegBytes(sheet, 0.95), dpi); PD.free(sheet);   // 14 Nov 2026: a JPEG, not a PDF
-          const wMm = two ? G.sheetMm.w * 2 + 10 : G.sheetMm.w, hMm = G.sheetMm.h;
-          const small = sheetAt(Math.min(dpi, 600 / Math.max(wMm, hMm) * 25.4));          // the little picture of the sheet
-          const prev = PD.canvas(600 * Math.min(1, wMm / hMm), 600 * Math.min(1, hMm / wMm)); PD.ctx(prev).drawImage(small, 0, 0, prev.width, prev.height); PD.free(small);
-          const mm = (wMm.toFixed(1) + ' x ' + hMm.toFixed(1)).replace(/\.0/g, '') + ' mm';
+          // One sheet for each side: a double-sided keyring has two print files, the front and then the back.
+          const jpegs = [];
+          for (const k of two ? [keep, keepB] : [keep]) { const sheet = PD.tplSheet(G, dpi, draw(k)); jpegs.push(PD.jpegAtDpi(await PD.toJpegBytes(sheet, 0.95), dpi)); PD.free(sheet); }   // 14 Nov 2026: JPEGs, not PDFs
+          const small = PD.tplSheet(G, Math.min(dpi, 600 / Math.max(wIn, hIn)), draw(keep));      // the little picture of the sheet
+          const prev = PD.canvas(600 * Math.min(1, wIn / hIn), 600 * Math.min(1, hIn / wIn)); PD.ctx(prev).drawImage(small, 0, 0, prev.width, prev.height); PD.free(small);
+          const mm = (G.sheetMm.w.toFixed(1) + ' x ' + G.sheetMm.h.toFixed(1)).replace(/\.0/g, '') + ' mm';
+          const base = slug(it.id + (variant ? ' ' + variant[0] : '') + (way ? ' ' + way.toLowerCase() : '') + ' - ' + tplName);
           return {
-            files: [{ name: slug(it.id + (variant ? ' ' + variant[0] : '') + (way ? ' ' + way.toLowerCase() : '') + (two ? ' both sides' : '') + ' - ' + tplName) + '.jpg', mime: 'image/jpeg', bytes: jpeg }],
+            files: jpegs.map((bytes, n) => ({ name: base + (two ? ['-side-1-of-2-front', '-side-2-of-2-back'][n] : '') + '.jpg', mime: 'image/jpeg', bytes })),
             preview: prev, ppi,
-            note: two ? 'BOTH SIDES, one sheet: front left, back right. ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Tops at LEFT' : '')
-              : 'Shop template: ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Top of the picture is at the LEFT of the sheet' : ''),
+            note: 'Shop template: ' + tplName + ', ' + mm + ', ' + Math.round(dpi) + ' dpi' + (G.turned ? '. Top of the picture is at the LEFT of the sheet' : ''),
           };
         },
       });
@@ -2541,7 +2534,7 @@ PD.unitPrice = function (it) {
   let sent = null;   // the order already started for this basket, so pressing Pay again never makes a second one
   function orderItems() {
     return basket.map(it => ({ product: it.product, size: it.size || '', orient: (it.settings && it.settings.orient) || '', item: it.item || '', variant: it.variant || '',
-      laminate: !!it.laminate, frame: it.frame || '', qty: it.qty, desc: [it.title, it.desc].filter(Boolean).join(': '), settings: it.settings }));
+      laminate: !!it.laminate, frame: it.frame || '', qty: it.qty, files: it.files === 2 ? 2 : 1, desc: [it.title, it.desc].filter(Boolean).join(': '), settings: it.settings }));
   }
   async function sendOrder(cust, made, status, bar, how) {
     status.firstChild.textContent = 'Sending your order…'; bar.style.width = '0%';
@@ -2553,15 +2546,18 @@ PD.unitPrice = function (it) {
     // came back from Stripe), the files are already with the shop: skip sending them and reopen that payment page.
     let waiting = false;
     for (let i = 0; i < basket.length && !waiting; i++) {
-      const r = made[i], f = r.files[0];
-      const file = await PD.blobToBase64(new Blob([f.bytes], { type: f.mime }));
+      const r = made[i];
       status.firstChild.textContent = basket.length > 1 ? 'Sending item ' + (i + 1) + ' of ' + basket.length + '…' : 'Sending your order…';
-      for (let tries = 0; ; tries++) {
-        try { await call('addItemFile', { order: start.orderNo, token: sent.token, index: i, file, mime: f.mime, ppi: Math.round(r.ppi || 0), note: r.note || '' }); break; }
-        catch (e) {
-          if (/already waiting for payment|already been sent/.test(e.message)) { waiting = true; break; }
-          if (tries >= 2 || /expired|already/.test(e.message)) throw e;
-          await PD.sleep(1500 * (tries + 1));
+      // One print file for each item, or two for a double-sided keyring: the front, then the back as side: 'back'.
+      for (let k = 0; k < (basket[i].files === 2 ? 2 : 1) && !waiting; k++) {
+        const f = r.files[k], file = await PD.blobToBase64(new Blob([f.bytes], { type: f.mime }));
+        for (let tries = 0; ; tries++) {
+          try { await call('addItemFile', Object.assign({ order: start.orderNo, token: sent.token, index: i, file, mime: f.mime, ppi: Math.round(r.ppi || 0), note: r.note || '' }, k ? { side: 'back' } : {})); break; }
+          catch (e) {
+            if (/already waiting for payment|already been sent/.test(e.message)) { waiting = true; break; }
+            if (tries >= 2 || /expired|already/.test(e.message)) throw e;
+            await PD.sleep(1500 * (tries + 1));
+          }
         }
       }
       bar.style.width = Math.round((i + 1) / basket.length * 100) + '%';
