@@ -1604,11 +1604,11 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     window.PDBasket.rememberCustomer(order.customer);
     const { box, add } = doneBox();
     add('h2', 'Added to your basket');
-    add('p', res.prints + (res.prints === 1 ? ' print, ' : ' prints, ') + pounds(res.total) + '. Add cards, calendars, canvases or mugs too, and pay for everything at once.', 'muted');
+    add('p', res.prints + (res.prints === 1 ? ' print, ' : ' prints, ') + pounds(res.total) + '. Add cards, calendars, canvases, mugs or photo gifts too, and pay for everything at once.', 'muted');
     const row = document.createElement('div'); row.style.display = 'grid'; row.style.gap = '10px';
     const pay = document.createElement('a'); pay.className = 'btn btn-primary'; pay.href = window.PDBasket.BASKET_URL;
     pay.textContent = 'Go to your basket and pay ' + pounds(window.PDBasket.total());
-    const more = document.createElement('a'); more.className = 'btn btn-ghost'; more.href = window.PDBasket.HOME_URL; more.textContent = 'Add cards, calendars, canvases or mugs';
+    const more = document.createElement('a'); more.className = 'btn btn-ghost'; more.href = window.PDBasket.HOME_URL; more.textContent = 'Add cards, calendars or photo gifts';
     const again = document.createElement('button'); again.type = 'button'; again.className = 'linkish'; again.textContent = 'Print more photos';
     again.addEventListener('click', resetAll);
     row.append(pay, more, again); box.appendChild(row);
