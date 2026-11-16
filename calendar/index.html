@@ -186,7 +186,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
           <label><input type="radio" name="pay" value="shop"><span><b>Pay in the shop</b><small>We&rsquo;ll only print your calendar after you&rsquo;ve paid at the counter. It&rsquo;s then ready the next working day.</small></span></label>
         </fieldset>
         <label class="check"><input type="checkbox" id="checked"> <span>I&rsquo;ve checked every page: the photos, the words and the dates.</span></label>
-        <p class="note">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details to make your calendar, and we delete them 30 days after your order.</p>
+        <p class="note">Collect from Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). We only use your photos and details to make your calendar, and we delete them 30 days after your order. We also note which link or advert brought you here.</p>
         <button class="btn" type="button" id="send">Send my order</button>
         <div class="status" id="status" role="status" hidden></div>
       </section>
@@ -201,7 +201,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
   <section class="done" id="done" hidden aria-live="polite"></section>
 </main>
 
-<script src="../basket/basket.js?v=1"></script>
+<script src="../basket/basket.js?v=2"></script>
 <script>
 (function () {
   'use strict';
@@ -583,7 +583,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.1; ma
       s.textContent = 'Sending your calendar (' + mb + ' MB). This can take a minute on a phone…';
       const res = await server('submitOrder', {
         token, customerName: name, phone, payment: pay, offers: !!($('cust-offers') && $('cust-offers').checked), returnUrl: RETURN_URL,
-        items: [{ occasion: 'calendar', design: 'calendar-a4', start: state.start, names: state.title, qty: n, pdf: await toBase64(blob), thumb: coverJpeg() }]
+        items: [{ occasion: 'calendar', design: 'calendar-a4', start: state.start, names: state.title, qty: n, pdf: await toBase64(blob), thumb: coverJpeg() }],
+        src: (window.PDBasket && window.PDBasket.from ? window.PDBasket.from() : '')
       });
       if (res.status === 'pay') { leaving = true; s.textContent = 'Taking you to the payment page…'; location.assign(res.payUrl); return; }
       if (res.status === 'held') { addedToBasket(res, name, phone); return; }

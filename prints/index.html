@@ -442,7 +442,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     <label class="check"><input type="checkbox" id="offers"><span>Send me occasional offers from Perfect Digital. You can stop them at any time.</span></label>
     <label class="check"><input type="checkbox" id="checked"><span>I've checked my photos, the crops and the number of copies.</span></label>
 
-    <p class="small muted"><span id="pay-small">You pay when you collect from</span> Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). <span id="pay-stripe" hidden>Card payments are handled by Stripe, which keeps its own payment records. </span>We only use your photos and details for your order, and we delete them 30 days after it. If you ask for offers, we keep your name and contact details to send them until you ask us to stop.</p>
+    <p class="small muted"><span id="pay-small">You pay when you collect from</span> Perfect Digital, 211 High Street North, East Ham E6 1JG (Monday to Saturday, 10am to 7pm). <span id="pay-stripe" hidden>Card payments are handled by Stripe, which keeps its own payment records. </span>We only use your photos and details for your order, and we delete them 30 days after it. We also note which link or advert brought you here. If you ask for offers, we keep your name and contact details to send them until you ask us to stop.</p>
     <p class="error" id="order-error" role="alert"></p>
     <button class="btn btn-primary btn-block btn-big" type="button" id="send">Send my photos to the shop</button>
     <div class="progress" id="progress" hidden>
@@ -512,7 +512,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   </div>
 </div>
 
-<script src="../basket/basket.js?v=1"></script>
+<script src="../basket/basket.js?v=2"></script>
 <script src="../vendor/jszip-3.10.1.min.js"></script>
 <script src="../vendor/smartcrop-2.0.5.js"></script>
 <script>
@@ -1475,7 +1475,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   async function sendLive(order, files) {
     setProgress(3, 'Contacting the shop…');
     const started = await run('startPhotoOrder', {
-      customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files)
+      customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files),
+      src: (window.PDBasket && window.PDBasket.from ? window.PDBasket.from() : '')
     });
     order.orderNo = started.orderNo;
     // Two prints are made and sent at a time.

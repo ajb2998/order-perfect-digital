@@ -12,6 +12,12 @@
  * Switching it on and off: basket/on.json ({"on": true} or {"on": false}). While it is off, every page uses its own
  * checkout, as before. Adding ?basket=try to a page's address switches the basket on in that tab only (for testing),
  * and ?basket=off switches it off again.
+ *
+ * Where a visit came from (16 Nov 2026). This file also works out where the visitor came from: the "from" in the
+ * link they followed (?from=insta, ?from=gads-xmas-mugs), or else the kind of site that sent them. It is kept for
+ * this browser tab only, so the next page, and the page they come back to after paying, still know it. Each page
+ * sends it with the order, and the order's log shows it in the "Came from" column. Every page except the canvases,
+ * mugs and gifts page (which counts its own steps) is also counted as opened, once per tab: daily totals only.
  */
 (function () {
   'use strict';
@@ -37,6 +43,25 @@
     try { sessionStorage.setItem(STORE, JSON.stringify(v)); return true; } catch (e) { return false; }
   }
   function money(v) { return '£' + Number(v).toFixed(2); }
+
+  // Where this visit came from. A tag in the link wins; otherwise what this tab was told earlier; otherwise the
+  // kind of site that sent them. Moving between our own pages never counts as coming from somewhere.
+  var FROM = 'pd-from', SEEN = 'pd-seen';
+  function tag(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+/, '').slice(0, 20); }
+  var SRC = (function () {
+    var given = '', kept = '';
+    try { var q = new URLSearchParams(location.search); given = tag(q.get('from') || q.get('utm_source')); } catch (e) { /* no tag */ }
+    try { kept = tag(sessionStorage.getItem(FROM)); } catch (e) { /* storage blocked */ }
+    var src = given || kept;
+    if (!src) {
+      var h = '';
+      try { h = new URL(document.referrer).hostname; } catch (e) { h = ''; }
+      src = !h || h === location.hostname ? 'direct' : /google\./.test(h) ? 'google' : /instagram/.test(h) ? 'instagram' : /facebook|fb\./.test(h) ? 'facebook'
+        : /(^|\.)perfect\.digital$/.test(h) ? 'website' : 'other';
+    }
+    try { sessionStorage.setItem(FROM, src); } catch (e) { /* storage blocked: each page works it out again */ }
+    return src;
+  })();
   // The basket changed: a payment page made for it no longer covers everything in it.
   function outOfDate(v) {
     if (v.pending && v.pending.session) v.previous = v.pending.session;
@@ -103,10 +128,27 @@
     } catch (e) { return ''; }
   }
 
+  // Counts this page as opened: once per tab, daily totals only, kept by the product orders script. Not on the test
+  // copies of the site, not on the shop's own PC (?shop), and not when the customer is coming back from paying.
+  function opened() {
+    try {
+      var m = /^\/(?:(cards|calendar|prints|basket|products)\/)?(?:index\.html)?$/.exec(location.pathname);
+      if (!m || m[1] === 'products') return;
+      if (location.hostname !== 'order.perfect.digital') return;
+      if (/[?&](paid|unpaid)=/.test(location.search) || /[?&]shop\b/.test(location.search) || location.hash === '#shop') return;
+      var ev = (m[1] === 'basket' ? 'checkout' : m[1] || 'home') + ':open', seen = '';
+      try { seen = sessionStorage.getItem(SEEN) || ''; } catch (e) { seen = ''; }
+      if ((',' + seen + ',').indexOf(',' + ev + ',') >= 0) return;
+      try { sessionStorage.setItem(SEEN, seen ? seen + ',' + ev : ev); } catch (e) { /* counted each time, then */ }
+      call('product', 'track', { ev: ev, src: SRC }).catch(function () { /* counting never gets in the way */ });
+    } catch (e) { /* counting never gets in the way */ }
+  }
+
   var api = {
     SCRIPTS: SCRIPTS, BASKET_URL: BASKET_URL, HOME_URL: HOME_URL,
     enabled: enabled,
     call: call,
+    from: function () { return SRC; },
     thumb: thumb,
     money: money,
     parts: function () { return load().parts; },
@@ -178,6 +220,7 @@
     }
   };
   window.PDBasket = api;
+  opened();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', api.paint);
   else api.paint();
   // Another page in this tab may have changed the basket (the Back button brings pages back as they were).
