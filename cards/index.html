@@ -55,13 +55,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .occasion { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 0 0 14px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
 .occasion button { border: 0; background: transparent; border-radius: 12px; padding: 9px 6px; font-weight: 600; font-size: 0.92rem; cursor: pointer; color: var(--muted); white-space: nowrap; }
 .occasion button[aria-pressed="true"] { background: var(--red); color: #fff; }
-@media (min-width: 640px) { .occasion { display: inline-grid; grid-template-columns: repeat(6, auto); } .occasion button { padding: 9px 16px; } }
+@media (min-width: 640px) { .occasion { display: inline-grid; grid-template-columns: repeat(4, auto); } .occasion button { padding: 9px 16px; } }
 /* Each occasion has its own accent colour (all pass contrast with white text). */
 body[data-occasion="birthday"] { --red: #C2185B; --red-dark: #8E0F42; }
 body[data-occasion="invitation"] { --red: #6D28D9; --red-dark: #4C1D95; }
 body[data-occasion="baby"] { --red: #0F766E; --red-dark: #0B5852; }
 body[data-occasion="wedding"] { --red: #8C6D3F; --red-dark: #6B522C; }
 body[data-occasion="anniversary"] { --red: #B4234A; --red-dark: #861A37; }
+body[data-occasion="thankyou"] { --red: #B45309; --red-dark: #8A3F06; }
+body[data-occasion="congrats"] { --red: #1D4ED8; --red-dark: #1E3A8A; }
 .hero h1 { font-family: var(--display); font-weight: 600; font-size: clamp(1.7rem, 6vw, 2.5rem); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
 .hero h1 span { color: var(--red); }
 .hero p { margin: 0 0 14px; color: var(--muted); max-width: 60ch; }
@@ -4436,6 +4438,804 @@ footer b { color: var(--ink); }
   });
 })(window);
 
+
+/* Thank you cards: the occasion and twelve designs (18 November 2026). Units: millimetres on an A5 portrait panel.
+   Also adds the two new occasions (thank you, congratulations) to the card maker's list; the congratulations
+   designs are in designs-congrats.js. */
+(function (global) {
+  'use strict';
+  const D = global.CardDesigns, S = D.svg, X = S.extra;
+  const { n, rect, circle, star, scatter, scallopTop, backPanel, insideRight, insideLeft, W, H, CX } = S;
+  const { path, ellipse, line, g, bg, bow, archPath, confetti, flower, leaf, posy, burst, rays, heart, sprig, sparkle, cloud, rainbow, goldDefs } = X;
+
+  /* ---------- the two new occasions ---------- */
+  D.OCCASIONS.thankyou = {
+    id: 'thankyou', label: 'Thank you', heading: 'photo thank you card',
+    greetings: ['Thank You', 'Thank You So Much', 'Many Thanks', 'Thanks a Million'],
+    namesLabel: 'Name or words on the front', namesPlaceholder: 'e.g. Mrs Khan, or Nan & Grandad',
+    messages: [
+      { id: 'thanks', label: 'Thank you, it means a lot', text: 'Thank you so much. It really means a lot' },
+      { id: 'gift', label: 'Thank you for the lovely gift', text: 'Thank you so much for the lovely gift' },
+      { id: 'teacher', label: 'Thank you for being a wonderful teacher', text: 'Thank you for being such a wonderful teacher' },
+      { id: 'help', label: 'Thank you for all your help', text: 'Thank you for all your help and kindness' },
+      { id: 'came', label: 'Thank you for celebrating with us', text: 'Thank you for coming and making the day so special' },
+      { id: 'custom', label: 'Write my own', text: '' },
+      { id: 'blank', label: 'Leave it blank to write by hand', text: '' }
+    ],
+    defaultMessage: 'thanks'
+  };
+  D.OCCASIONS.congrats = {
+    id: 'congrats', label: 'Congratulations', tab: 'Congrats', heading: 'congratulations card',
+    greetings: ['Congratulations', 'Well Done', 'You Did It!', 'So Proud of You'],
+    namesLabel: 'Name on the front', namesPlaceholder: 'e.g. Aisha, or Dr Rahman',
+    fields: [{ id: 'reason', label: "What's it for? (optional)", placeholder: 'e.g. on your new job', max: 34, side: 'front' }],
+    messages: [
+      { id: 'proud', label: "We're so proud of you", text: "Congratulations! We're so proud of you" },
+      { id: 'deserve', label: 'You deserve it', text: 'Congratulations on your achievement. You deserve it!' },
+      { id: 'hard', label: 'Your hard work has paid off', text: 'All your hard work has paid off. Well done!' },
+      { id: 'next', label: 'Every success in your next chapter', text: 'Wishing you every success in your next chapter' },
+      { id: 'custom', label: 'Write my own', text: '' },
+      { id: 'blank', label: 'Leave it blank to write by hand', text: '' }
+    ],
+    defaultMessage: 'proud'
+  };
+  for (const o of ['thankyou', 'congrats']) if (D.OCCASION_ORDER.indexOf(o) < 0) D.OCCASION_ORDER.push(o);
+
+  /* ---------- shared by both new sets ---------- */
+  const PINK = '#FF5C8A', YELLOW = '#FFC93C', TEAL = '#2EC4B6', PURPLE = '#7B5CD6', BLUE = '#4D96FF', CORAL = '#FF7F50', GREEN = '#3BB273', NAVY = '#1B2A4A', GOLD = '#E9C46A';
+  const INK = '#33283A';
+  const box = (font, size, min, o) => (value, y, h, color, extra) => Object.assign({ box: true, x: 10, y, w: W - 20, h, size, minSize: min, lines: 2, oneLine: 0.72, font, color, value }, o || {}, extra || {});
+  const T = {
+    script: box('Pacifico', 18, 7),
+    vibes: box('Great Vibes', 25, 9),
+    chunky: box('Luckiest Guy', 17, 7, { lineHeight: 1.0 }),
+    serif: box('Playfair Display', 14.5, 6, { weight: 700 }),
+    round: box('Fredoka', 9.5, 3.6, { weight: 600, x: 12, w: W - 24, oneLine: 0.8 }),
+    caps: box('Montserrat', 4.6, 2.8, { weight: 600, upper: true, spacing: 0.16, lines: 1, x: 14, w: W - 28 })
+  };
+  const polaroid = (cx, cy, w, h, rot) => {
+    const rad = rot * Math.PI / 180;
+    const at = (x, y) => ({ x: cx + x * Math.cos(rad) - y * Math.sin(rad), y: cy + x * Math.sin(rad) + y * Math.cos(rad) });
+    return { at, frame: (paper, shade) => g('rotate(' + rot + ' ' + n(cx) + ' ' + n(cy) + ')', rect(cx - w / 2 + 1.4, cy - h / 2 + 2.2, w, h, shade || 'rgba(0,0,0,0.2)', ' rx="1.2"') + rect(cx - w / 2, cy - h / 2, w, h, paper || '#FFFFFF', ' rx="1.2"')) };
+  };
+  const mat = (x, y, w, h, r, shade) => rect(x - 1.5 + 2.2, y - 1.5 + 2.6, w + 3, h + 3, shade || 'rgba(60,30,30,0.16)', ' rx="' + n(r + 1) + '"') + rect(x - 1.5, y - 1.5, w + 3, h + 3, '#FFFFFF', ' rx="' + n(r + 1) + '"');
+  const hearts = (seed, count, cols, skip, k) => scatter(seed, count, -2, -2, W + 2, H + 2, (x, y, t, i) => (skip && skip(x, y)) ? '' : heart(x, y, (0.35 + t * 0.5) * (k || 1), cols[i % cols.length]));
+  const daisy = (cx, cy, r, petal, centre) => flower(cx, cy, r, petal || '#FFFFFF', centre || YELLOW, 8);
+  S.more = { PINK, YELLOW, TEAL, PURPLE, BLUE, CORAL, GREEN, NAVY, GOLD, INK, T, polaroid, mat, hearts, daisy };
+
+  const greet = s => s.greeting || 'Thank You';
+  const names = s => s.names;
+  const add = d => D.add(Object.assign({ occasion: 'thankyou' }, d));
+  const inside = (accent, motif, ink, font) => insideRight({ accent, ink: ink || INK, motif, font });
+
+  /* ---------- motifs ---------- */
+  function sun(cx, cy, r, color, rayColor) {
+    let out = '';
+    for (let i = 0; i < 12; i++) out += line(cx, cy - r * 1.35, cx, cy - r * 1.9, rayColor || color, n(r * 0.22), ' transform="rotate(' + (i * 30) + ' ' + n(cx) + ' ' + n(cy) + ')"');
+    return out + circle(cx, cy, r, color);
+  }
+  // A ring of leaves and small flowers round a circle.
+  function wreath(cx, cy, r, leafCols, flowerCols) {
+    let out = '';
+    for (let i = 0; i < 28; i++) {
+      const a = i * 360 / 28, rad = a * Math.PI / 180;
+      const x = cx + r * Math.cos(rad), y = cy + r * Math.sin(rad);
+      out += leaf(x, y, 11, a + (i % 2 ? 62 : 118), leafCols[i % leafCols.length]);
+    }
+    [20, 95, 160, 215, 290, 335].forEach((a, i) => {
+      const rad = a * Math.PI / 180, x = cx + (r + 1) * Math.cos(rad), y = cy + (r + 1) * Math.sin(rad);
+      out += flower(x, y, i % 2 ? 4.2 : 5.4, flowerCols[i % flowerCols.length], '#F9D86A');
+    });
+    return out;
+  }
+  // A wrapped bunch of flowers, about 90 wide and 120 tall, centred on cx with the flowers' middle at cy.
+  function bouquet(cx, cy) {
+    const stems = [[-20, -14], [-9, -24], [3, -28], [15, -22], [24, -10], [-28, 0], [10, -6], [-6, -4]];
+    let out = '';
+    stems.forEach(([dx, dy]) => { out += '<path d="M' + n(cx + dx) + ',' + n(cy + dy) + ' Q' + n(cx + dx * 0.4) + ',' + n(cy + 30) + ' ' + n(cx) + ',' + n(cy + 62) + '" stroke="#5E9B6B" stroke-width="1.3" fill="none" stroke-linecap="round"/>'; });
+    out += leaf(cx - 30, cy + 8, 22, 200, '#6AA574') + leaf(cx + 30, cy + 6, 22, -20, '#7FB685') + leaf(cx - 16, cy - 30, 18, 250, '#8CC096') + leaf(cx + 22, cy - 28, 18, -60, '#6AA574') + leaf(cx + 2, cy - 40, 16, -92, '#7FB685');
+    // the paper wrap
+    out += path('M' + n(cx - 34) + ',' + n(cy + 14) + ' L' + n(cx + 34) + ',' + n(cy + 14) + ' L' + n(cx + 9) + ',' + n(cy + 86) + ' L' + n(cx - 9) + ',' + n(cy + 86) + 'Z', '#F4D9B5') +
+      path('M' + n(cx - 34) + ',' + n(cy + 14) + ' L' + n(cx - 2) + ',' + n(cy + 14) + ' L' + n(cx + 4) + ',' + n(cy + 86) + ' L' + n(cx - 9) + ',' + n(cy + 86) + 'Z', '#EBC79A') +
+      path('M' + n(cx - 34) + ',' + n(cy + 14) + ' L' + n(cx + 34) + ',' + n(cy + 14) + ' L' + n(cx + 28) + ',' + n(cy + 24) + ' L' + n(cx - 30) + ',' + n(cy + 26) + 'Z', '#FFE9CC');
+    out += flower(cx - 22, cy - 6, 15, PINK, YELLOW, 7) + flower(cx + 22, cy - 2, 14, PURPLE, '#FFE08A', 7) + flower(cx + 2, cy - 22, 16, CORAL, '#FFF1B8', 8) +
+      flower(cx - 8, cy + 8, 12, '#FFFFFF', YELLOW, 8) + flower(cx + 12, cy + 12, 10, YELLOW, CORAL, 6) + flower(cx - 30, cy + 12, 9, '#FFB3C7', '#FFFFFF', 6) +
+      flower(cx + 31, cy - 20, 8, '#FFFFFF', PINK, 6) + flower(cx - 14, cy - 28, 9, '#B9A4F0', '#FFFFFF', 6) + circle(cx + 14, cy - 36, 3, YELLOW) + circle(cx - 32, cy - 14, 2.6, CORAL);
+    out += rect(cx - 13, cy + 54, 26, 6, PINK, ' rx="2"') + bow(cx, cy + 57, 1.25, PINK, '#D93A6C');
+    return out;
+  }
+  function apple(cx, cy, s) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') scale(' + n(s) + ')',
+      ellipse(0, 19, 17, 2.6, 'rgba(0,0,0,0.22)') +
+      path('M0,-10 C-6,-16 -20,-13 -20,2 C-20,13 -11,20 -5,19 C-2,18.6 -1,18 0,18 C1,18 2,18.6 5,19 C11,20 20,13 20,2 C20,-13 6,-16 0,-10Z', '#E5383B') +
+      path('M-13,-6 C-16,-2 -16,5 -13,9', 'none', ' stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" opacity="0.55"') +
+      path('M0,-10 C0,-15 2,-19 5,-21', 'none', ' stroke="#6B4226" stroke-width="1.8" stroke-linecap="round"') +
+      leaf(3, -17, 12, -25, '#56B870'));
+  }
+  function pencil(cx, cy, len, rot) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') rotate(' + n(rot) + ')',
+      rect(-len / 2, -3.2, len - 12, 6.4, '#FFC93C') + rect(-len / 2, -3.2, len - 12, 2.1, '#FFD86B') + rect(-len / 2, 1.1, len - 12, 2.1, '#F2B01E') +
+      rect(-len / 2 - 8, -3.2, 5, 6.4, '#FF8FAB', ' rx="1.4"') + rect(-len / 2 - 3.4, -3.2, 3.4, 6.4, '#C9CED6') +
+      path('M' + n(len / 2 - 12) + ',-3.2 L' + n(len / 2) + ',0 L' + n(len / 2 - 12) + ',3.2Z', '#F4D9B5') + path('M' + n(len / 2 - 4) + ',-1.07 L' + n(len / 2) + ',0 L' + n(len / 2 - 4) + ',1.07Z', '#3A3340'));
+  }
+  const chalk = (d, w) => '<path d="' + d + '" stroke="#FFFFFF" stroke-width="' + (w || 0.7) + '" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>';
+  const chalkStar = (cx, cy, r) => '<polygon points="' + S.starPts(cx, cy, r) + '" fill="none" stroke="#FFFFFF" stroke-width="0.7" stroke-linejoin="round" opacity="0.5"/>';
+  // A ribbon banner with notched ends, centred on cx.
+  function banner(cx, y, w, h, color, dark) {
+    return path('M' + n(cx - w / 2 - 9) + ',' + n(y + 3) + ' L' + n(cx - w / 2 + 3) + ',' + n(y + 3) + ' L' + n(cx - w / 2 + 3) + ',' + n(y + h + 3) + ' L' + n(cx - w / 2 - 9) + ',' + n(y + h + 3) + ' L' + n(cx - w / 2 - 4.5) + ',' + n(y + h / 2 + 3) + 'Z', dark) +
+      path('M' + n(cx + w / 2 + 9) + ',' + n(y + 3) + ' L' + n(cx + w / 2 - 3) + ',' + n(y + 3) + ' L' + n(cx + w / 2 - 3) + ',' + n(y + h + 3) + ' L' + n(cx + w / 2 + 9) + ',' + n(y + h + 3) + ' L' + n(cx + w / 2 + 4.5) + ',' + n(y + h / 2 + 3) + 'Z', dark) +
+      rect(cx - w / 2, y, w, h, color, ' rx="1"');
+  }
+  Object.assign(S.more, { sun, wreath, banner });
+
+  /* ---------- 1. Sunny Thanks (photo) ---------- */
+  add({
+    id: 'ty-sunny', name: 'Sunny Thanks', kind: 'photo', slots: ['p1'], accent: '#E98A15',
+    sample: { photos: { p1: 'mumgirl' }, names: 'Love from Zara' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg(YELLOW),
+        photos: [{ id: 'p1', x: -1.5, y: -1.5, w: W + 3, h: 146 }],
+        fg: () => scallopTop(138, 4.5, -3.2, W + 3, '#FFFFFF') + scallopTop(140, 4.5, -3.2, W + 3, YELLOW) +
+          daisy(14, 160, 6) + daisy(135, 158, 6.5) + daisy(11, 196, 5) + daisy(138, 197, 5.5) + daisy(24, 204, 3.4) + daisy(126, 205, 3.4) +
+          circle(22, 150, 1.2, '#FFFFFF') + circle(128, 149, 1.2, '#FFFFFF'),
+        texts: [
+          T.script(greet, 151, 24, '#FFFFFF', { x: 22, w: W - 44, shadow: { dx: 0.5, dy: 0.7, color: 'rgba(170,90,0,0.45)' } }),
+          T.round(names, 177, 18, NAVY, { x: 22, w: W - 44 })
+        ]
+      },
+      back: backPanel('#E98A15', daisy(CX, 148, 6, YELLOW, '#E98A15')),
+      insideLeft, insideRight: inside('#E98A15', sun(CX, 38, 6.5, YELLOW, '#F4A52A'))
+    }
+  });
+
+  /* ---------- 2. Heart Polaroid (photo) ---------- */
+  (function () {
+    const P = polaroid(74.25, 82, 104, 124, -3), win = P.at(0, -10), cap = P.at(0, 49);
+    add({
+      id: 'ty-polaroid', name: 'Heart Polaroid', kind: 'photo', slots: ['p1'], accent: '#E0457B', namesLabel: 'Words on the photo', namesPlaceholder: 'e.g. Love from the Ali family',
+      sample: { photos: { p1: 'friends' }, names: 'Love from all of us' },
+      panels: {
+        front: {
+          extraLeft: 1.5,
+          bg: () => bg('#FFE3EC') + hearts(41, 110, ['#FF9DB8', '#FFFFFF', '#FF7AA2', '#FFC2D4'], (x, y) => y > 150 && y < 198) + P.frame('#FFFFFF', 'rgba(150,40,80,0.22)'),
+          photos: [{ id: 'p1', x: win.x - 46, y: win.y - 46, w: 92, h: 92, rot: -3 }],
+          fg: () => g('rotate(-8 ' + n(P.at(0, -62).x) + ' ' + n(P.at(0, -62).y) + ')', rect(P.at(0, -62).x - 17, P.at(0, -62).y - 5, 34, 10, 'rgba(255,122,162,0.85)')),
+          texts: [
+            { box: true, x: cap.x - 46, y: cap.y - 9.5, w: 92, h: 19, size: 10.5, minSize: 4, lines: 2, lineHeight: 1.02, font: 'Dancing Script', weight: 700, color: '#2F2B28', rot: -3, value: names },
+            T.script(greet, 158, 34, '#E0457B')
+          ]
+        },
+        back: backPanel('#E0457B', heart(CX, 148, 0.8, '#E0457B')),
+        insideLeft, insideRight: inside('#E0457B', heart(CX - 7, 37, 0.7, '#FF9DB8') + heart(CX + 1, 33, 1.1, '#E0457B') + heart(CX + 9, 39, 0.6, '#FFC2D4'))
+      }
+    });
+  })();
+
+  /* ---------- 3. Floral Frame (photo) ---------- */
+  add({
+    id: 'ty-floral', name: 'Floral Frame', kind: 'photo', slots: ['p1'], accent: '#C2476B',
+    sample: { photos: { p1: 'jumper' }, names: 'With love from Priya' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#FFF8EE') + mat(21, 20, 106.5, 112, 5),
+        photos: [{ id: 'p1', x: 21, y: 20, w: 106.5, h: 112, shape: 'rect', r: 5 }],
+        fg: () => posy(22, 24, 1.7, -35) + posy(127, 128, 1.7, 145) + posy(128, 22, 1.0, 40) + posy(21, 130, 1.0, 220) +
+          leaf(8, 150, 14, -60, '#8CC096') + leaf(140, 150, 14, 240, '#8CC096'),
+        texts: [
+          T.vibes(greet, 142, 32, '#C2476B'),
+          T.round(names, 176, 18, '#4A6B57')
+        ]
+      },
+      back: backPanel('#C2476B', posy(CX, 150, 0.8, 0)),
+      insideLeft, insideRight: inside('#C2476B', posy(CX, 40, 1.3, 0))
+    }
+  });
+
+  /* ---------- 4. Boho Arch (photo) ---------- */
+  add({
+    id: 'ty-arch', name: 'Boho Arch', kind: 'photo', slots: ['p1'], accent: '#B5573A',
+    sample: { photos: { p1: 'toddler' }, names: 'From Leo and family' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#F7E8D9') + circle(118, 30, 15, '#F2C078') +
+          path(archPath(CX - 49, 14, 98, 138), '#E8B79B') + path(archPath(CX - 43.5, 19.5, 87, 138), '#D98E73') + path(archPath(CX - 38.5, 24.5, 77, 138), '#FFFFFF') +
+          rect(-3, 136, W + 6, 80, '#F7E8D9'),
+        photos: [{ id: 'p1', x: CX - 36.5, y: 26.5, w: 73, h: 109.5, shape: 'arch' }],
+        fg: () => sprig(20, 142, 44, -14, '#7A8F6A', '#9DB08A') + sprig(128.5, 142, 44, 14, '#7A8F6A', '#9DB08A') +
+          rect(CX - 49, 136, 98, 1.2, '#D98E73'),
+        texts: [
+          T.script(greet, 144, 30, '#B5573A'),
+          T.round(names, 176, 18, '#5F6F52')
+        ]
+      },
+      back: backPanel('#B5573A', sprig(CX, 158, 16, 0, '#7A8F6A', '#9DB08A')),
+      insideLeft, insideRight: inside('#B5573A', sprig(CX - 8, 46, 18, -22, '#7A8F6A', '#9DB08A') + sprig(CX + 8, 46, 18, 22, '#B5573A', '#D98E73'))
+    }
+  });
+
+  /* ---------- 5. Leafy Wreath (photo) ---------- */
+  add({
+    id: 'ty-wreath', name: 'Leafy Wreath', kind: 'photo', slots: ['p1'], accent: '#2F6B4F',
+    sample: { photos: { p1: 'mumbaby' }, names: 'Love from Baby Idris' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#E3EFE2') + scatter(9, 34, -2, -2, W + 2, H + 2, (x, y, t) => (Math.hypot(x - CX, y - 78) < 66 || (y > 144 && y < 198)) ? '' : circle(x, y, 0.6 + t, '#FFFFFF', ' opacity="0.8"')) +
+          circle(CX, 78, 49, '#FFFFFF'),
+        photos: [{ id: 'p1', x: CX - 44, y: 34, w: 88, h: 88, shape: 'circle' }],
+        fg: () => wreath(CX, 78, 51.5, ['#5E9B6B', '#7FB685', '#3F7D55', '#9CCBA4'], ['#FFFFFF', '#FFB3C7', '#FFE08A']),
+        texts: [
+          T.vibes(greet, 144, 32, '#2F6B4F'),
+          T.round(names, 177, 18, '#3A4A40')
+        ]
+      },
+      back: backPanel('#2F6B4F', leaf(CX - 9, 150, 9, 200, '#5E9B6B') + leaf(CX + 9, 150, 9, -20, '#7FB685') + flower(CX, 149, 3.6, '#FFB3C7', '#F9D86A')),
+      insideLeft, insideRight: inside('#2F6B4F', leaf(CX - 14, 40, 14, 200, '#5E9B6B') + leaf(CX + 14, 40, 14, -20, '#7FB685') + flower(CX, 38, 5.5, '#FFB3C7', '#F9D86A'))
+    }
+  });
+
+  /* ---------- 6. Thank You Trio (3 photos) ---------- */
+  add({
+    id: 'ty-trio', name: 'Three Photos', kind: 'photo', slots: ['p1', 'p2', 'p3'], accent: '#12897D',
+    sample: { photos: { p1: 'friends', p2: 'dad', p3: 'girl' }, names: 'From Amara, Joe and the kids' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#E6F7F4') + confetti(61, 60, -2, 150, W + 2, H + 2, [TEAL, YELLOW, PINK, '#FFFFFF', PURPLE], (x, y) => x > 12 && x < 136 && y > 156 && y < 200) +
+          mat(10, 10, 128.5, 82, 4, 'rgba(0,70,60,0.16)') + mat(10, 98, 62, 54, 4, 'rgba(0,70,60,0.16)') + mat(76.5, 98, 62, 54, 4, 'rgba(0,70,60,0.16)'),
+        photos: [
+          { id: 'p1', x: 10, y: 10, w: 128.5, h: 82, shape: 'rect', r: 4 },
+          { id: 'p2', x: 10, y: 98, w: 62, h: 54, shape: 'rect', r: 4 },
+          { id: 'p3', x: 76.5, y: 98, w: 62, h: 54, shape: 'rect', r: 4 }
+        ],
+        texts: [
+          T.script(greet, 157, 26, '#12897D', { x: 14, w: W - 28 }),
+          T.round(names, 184, 16, NAVY, { x: 14, w: W - 28 })
+        ]
+      },
+      back: backPanel('#12897D', confetti(5, 12, CX - 8, 142, CX + 8, 154, [TEAL, YELLOW, PINK, PURPLE])),
+      insideLeft, insideRight: inside('#12897D', confetti(9, 22, CX - 14, 28, CX + 14, 46, [TEAL, YELLOW, PINK, PURPLE]))
+    }
+  });
+
+  /* ---------- 7. Bouquet (no photo) ---------- */
+  add({
+    id: 'ty-bouquet', name: 'Bouquet', kind: 'words', slots: [], accent: '#D6456F',
+    sample: { names: 'Nan & Grandad' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#FFF3E6') + scatter(13, 26, -2, -2, W + 2, 140, (x, y, t) => Math.abs(x - CX) < 50 ? '' : circle(x, y, 0.8 + t * 1.4, t > 0.5 ? '#FFD1DC' : '#FFE3A8')) + bouquet(CX, 58),
+        texts: [
+          T.script(greet, 148, 30, '#D6456F'),
+          T.round(names, 180, 18, '#4A6B57')
+        ]
+      },
+      back: backPanel('#D6456F', flower(CX, 148, 6, PINK, YELLOW, 7)),
+      insideLeft, insideRight: inside('#D6456F', leaf(CX - 12, 42, 12, 200, '#6AA574') + leaf(CX + 12, 42, 12, -20, '#7FB685') + flower(CX - 6, 38, 6, PINK, YELLOW, 7) + flower(CX + 6, 36, 5, PURPLE, '#FFE08A', 7))
+    }
+  });
+
+  /* ---------- 8. Rainbow (no photo) ---------- */
+  add({
+    id: 'ty-rainbow', name: 'Rainbow', kind: 'words', slots: [], accent: '#2D7FD3',
+    sample: { names: 'Miss Okafor' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#EAF6FF') + sun(124, 26, 9, YELLOW, '#FFB703') +
+          [[18, 24, 0.7], [36, 42, 0.5], [52, 18, 0.6], [72, 36, 0.8], [90, 20, 0.5], [22, 56, 0.5], [100, 50, 0.6], [58, 56, 0.45]].map(([x, y, k], i) => heart(x, y, k, ['#FF5C8A', '#8E6BE8', '#FFD23F', '#4D96FF', '#FFB3C7'][i % 5])).join('') +
+          rainbow(CX, 114, 48, 6.6, ['#FF5C6C', '#FF9F43', '#FFD23F', '#4CC98A', '#4D96FF', '#8E6BE8']) +
+          cloud(CX - 45, 112, 1.1, '#FFFFFF') + cloud(CX + 45, 112, 1.1, '#FFFFFF') +
+          heart(CX, 100, 1.4, '#FF5C8A'),
+        texts: [
+          T.chunky(greet, 134, 34, '#FF5C8A', { shadow: { dx: 0.5, dy: 0.6, color: 'rgba(27,42,74,0.18)' } }),
+          T.round(names, 172, 20, NAVY)
+        ]
+      },
+      back: backPanel('#2D7FD3', rainbow(CX, 153, 9, 1.5, ['#FF5C6C', '#FF9F43', '#FFD23F', '#4CC98A', '#4D96FF'])),
+      insideLeft, insideRight: inside('#2D7FD3', rainbow(CX, 44, 14, 2.2, ['#FF5C6C', '#FF9F43', '#FFD23F', '#4CC98A', '#4D96FF', '#8E6BE8']))
+    }
+  });
+
+  /* ---------- 9. Big Heart (no photo) ---------- */
+  add({
+    id: 'ty-heart', name: 'Big Heart', kind: 'words', slots: [], accent: '#E63E6D',
+    sample: { names: 'for everything' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><radialGradient id="tyh" cx="50%" cy="38%" r="80%"><stop offset="0" stop-color="#FF7A9C"/><stop offset="1" stop-color="#E63E6D"/></radialGradient></defs>' + bg('url(#tyh)') +
+          hearts(23, 70, ['#FF9DB8', '#FFC2D4', '#F0557F'], (x, y) => Math.hypot(x - CX, y - 82) < 56 || (y > 146 && y < 196), 1.2) +
+          heart(CX + 1.6, 86.4, 7.6, 'rgba(120,10,50,0.25)') + heart(CX, 84, 7.6, '#FFFFFF'),
+        texts: [
+          T.script(greet, 56, 44, '#E63E6D', { x: CX - 36, w: 72, size: 15 }),
+          T.round(names, 152, 30, '#FFFFFF', { size: 12 })
+        ]
+      },
+      back: backPanel('#E63E6D', heart(CX, 148, 0.8, '#E63E6D')),
+      insideLeft, insideRight: inside('#E63E6D', heart(CX, 38, 1.2, '#E63E6D'))
+    }
+  });
+
+  /* ---------- 10. Star Teacher (no photo) ---------- */
+  add({
+    id: 'ty-teacher', name: 'Star Teacher', kind: 'words', slots: [], accent: '#2F6B5A', namesPlaceholder: 'e.g. Miss Patel',
+    sample: { names: 'Miss Patel', greeting: 'Thank You' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><radialGradient id="tyb" cx="50%" cy="40%" r="85%"><stop offset="0" stop-color="#3B7D69"/><stop offset="1" stop-color="#24574A"/></radialGradient></defs>' + bg('url(#tyb)') +
+          chalkStar(20, 17, 5) + chalkStar(130, 16, 4.2) + chalkStar(134, 118, 4) + chalkStar(52, 124, 3.6) +
+          chalk('M72,13 l8,0 M76,9 l0,8') + chalk('M18,118 l5,5 M23,118 l-5,5') + chalk('M14,138 q6,-6 12,0 t12,0 t12,0') +
+          chalk('M30,128 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0') + chalk('M100,13 l12,0 M100,17 l8,0') + chalk('M38,13 l6,6 M44,13 l-6,6') +
+          rect(-3, 178, W + 6, 36, '#C89B6D') + rect(-3, 178, W + 6, 3, '#DDB58A') +
+          pencil(42, 170, 62, -8) + apple(104, 153, 1.5),
+        texts: [
+          T.script(greet, 26, 40, '#FFFFFF', { size: 20 }),
+          T.round(names, 70, 26, '#FFE08A', { size: 13 }),
+          T.caps(() => 'you are a star', 100, 8, '#CFE8DF')
+        ]
+      },
+      back: backPanel('#2F6B5A', apple(CX, 147, 0.42)),
+      insideLeft, insideRight: inside('#2F6B5A', apple(CX, 36, 0.62))
+    }
+  });
+
+  /* ---------- 11. Big Thanks (no photo) ---------- */
+  add({
+    id: 'ty-burst', name: 'Big Thanks', kind: 'words', slots: [], accent: '#E4326F',
+    sample: { names: 'You are the best!' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => rays(CX, 84, 28, '#FFC93C', '#FFB703') +
+          burst(CX + 2, 87, 66, 52, 16, 'rgba(27,42,74,0.28)') + burst(CX, 84, 66, 52, 16, '#FFFFFF', '#FF5C8A', 2.4) +
+          star(18, 22, 5, '#FFFFFF') + star(131, 26, 4, '#FFFFFF') + star(16, 146, 4, '#FFFFFF') + star(134, 142, 5.5, '#FFFFFF') +
+          banner(CX, 162, 104, 22, NAVY, '#111C33'),
+        texts: [
+          T.chunky(greet, 56, 56, '#FF3D7F', { x: CX - 34, w: 68, size: 25, oneLine: 0.97, shadow: { dx: 0.7, dy: 0.8, color: '#1B2A4A' } }),
+          T.round(names, 163.5, 19, '#FFFFFF', { x: CX - 48, w: 96, size: 9 })
+        ]
+      },
+      back: backPanel('#E4326F', burst(CX, 148, 7, 5, 12, YELLOW)),
+      insideLeft, insideRight: inside('#E4326F', burst(CX, 38, 11, 8, 14, YELLOW) + star(CX, 38, 4.4, '#FF5C8A'))
+    }
+  });
+
+  /* ---------- 12. Gold Sparkle (no photo) ---------- */
+  add({
+    id: 'ty-gold', name: 'Gold Sparkle', kind: 'words', slots: [], accent: '#9A7526',
+    sample: { names: 'from Mr & Mrs Hussain' },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><radialGradient id="tyn" cx="50%" cy="42%" r="80%"><stop offset="0" stop-color="#24365F"/><stop offset="1" stop-color="#121C36"/></radialGradient></defs>' + goldDefs('tyg') + bg('url(#tyn)') +
+          scatter(31, 90, -2, -2, W + 2, H + 2, (x, y, t, i) => (y > 66 && y < 150 && x > 12 && x < 136) ? '' : (t > 0.8 ? sparkle(x, y, 1.4 + t * 2.2, '#F2D08A') : circle(x, y, 0.3 + t * 0.7, i % 2 ? '#F2D08A' : '#FFFFFF', ' opacity="' + n(0.35 + t * 0.6) + '"'))) +
+          sparkle(CX, 44, 7, '#F2D08A') + sparkle(CX - 16, 52, 3, '#FFFFFF') + sparkle(CX + 16, 52, 3, '#FFFFFF') +
+          sprig(34, 190, 40, -62, '#C8922E', '#F2D08A') + sprig(114.5, 190, 40, 62, '#C8922E', '#F2D08A') +
+          rect(CX - 20, 132, 40, 0.5, '#C8922E'),
+        texts: [
+          T.vibes(greet, 68, 58, '#F2D08A', { size: 30 }),
+          T.serif(names, 137, 22, '#FFF6E0', { size: 8.5, weight: 600 })
+        ]
+      },
+      back: backPanel('#9A7526', sparkle(CX, 148, 5, '#C8922E')),
+      insideLeft, insideRight: inside('#9A7526', sparkle(CX, 38, 7, '#C8922E') + sparkle(CX - 11, 43, 2.6, '#E9C46A') + sparkle(CX + 11, 43, 2.6, '#E9C46A'), '#2A2433')
+    }
+  });
+})(window);
+
+/* Congratulations cards: twelve designs (18 November 2026). Units: millimetres on an A5 portrait panel.
+   The occasion itself and the shared pieces (S.more) are set up in designs-thankyou.js, which must come first. */
+(function (global) {
+  'use strict';
+  const D = global.CardDesigns, S = D.svg, X = S.extra, M = S.more;
+  const { n, rect, circle, star, scatter, backPanel, insideRight, insideLeft, W, H, CX } = S;
+  const { path, ellipse, line, g, bg, bow, archPath, confetti, balloon, burst, rays, heart, sparkle, cloud } = X;
+  const { PINK, YELLOW, TEAL, PURPLE, BLUE, CORAL, GREEN, NAVY, GOLD, INK, T, polaroid, mat, sun } = M;
+
+  const greet = s => s.greeting || 'Congratulations';
+  const names = s => s.names;
+  const reason = s => (s.fields && s.fields.reason) || '';
+  const add = d => D.add(Object.assign({ occasion: 'congrats' }, d));
+  const inside = (accent, motif, ink) => insideRight({ accent, ink: ink || INK, motif });
+  const PARTY = [GOLD, '#FFFFFF', PINK, TEAL];
+
+  /* ---------- motifs ---------- */
+  function cap(cx, cy, s, rot) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') rotate(' + n(rot || 0) + ') scale(' + n(s) + ')',
+      path('M-13,3 L-13,13 C-6,18 6,18 13,13 L13,3Z', '#27375E') +
+      '<polygon points="-24,0 0,-10 24,0 0,10" fill="#1B2A4A"/>' + path('M-24,0 L0,-10 L24,0 L0,-6.2Z', '#30457A') +
+      path('M0,0 L18,3 L18,15', 'none', ' stroke="#F2B63C" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"') +
+      rect(16.5, 14, 3, 6.5, '#F2B63C', ' rx="0.8"') + circle(0, 0, 1.8, '#F2B63C'));
+  }
+  function scroll(cx, cy, s, rot) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') rotate(' + n(rot || 0) + ') scale(' + n(s) + ')',
+      rect(-17, -4.6, 34, 9.2, '#FFF8E7', ' rx="4.6"') + ellipse(-15.4, 0, 2, 4.6, '#EAD9B5') + ellipse(15.4, 0, 2, 4.6, '#EAD9B5') +
+      rect(-2.4, -5.2, 4.8, 10.4, '#E5383B', ' rx="0.8"') + bow(0, 0, 0.5, '#E5383B', '#B92B2E'));
+  }
+  function trophy(cx, cy, s) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') scale(' + n(s) + ')',
+      ellipse(0, 35, 22, 2.6, 'rgba(0,40,60,0.25)') +
+      path('M-19,-26 C-37,-26 -35,-4 -14,-1', 'none', ' stroke="#E0A526" stroke-width="4.6" stroke-linecap="round"') +
+      path('M19,-26 C37,-26 35,-4 14,-1', 'none', ' stroke="#E0A526" stroke-width="4.6" stroke-linecap="round"') +
+      path('M-21,-32 L21,-32 C21,-6 11,8 0,10 C-11,8 -21,-6 -21,-32Z', '#F7C948') +
+      path('M2,-32 L21,-32 C21,-6 11,8 0,10 C6,2 9,-12 2,-32Z', '#EDB52F') +
+      rect(-23.5, -35.5, 47, 5.4, '#FFDD73', ' rx="2.7"') +
+      path('M-15,-26 C-15,-13 -10,-3 -5,2', 'none', ' stroke="#FFF3C4" stroke-width="3" stroke-linecap="round" opacity="0.85"') +
+      star(1, -15, 6.2, '#FFFFFF') +
+      path('M-4,10 L4,10 L5.4,20 L-5.4,20Z', '#E0A526') + rect(-13, 20, 26, 6, '#F7C948', ' rx="1.5"') +
+      rect(-18, 26, 36, 8.5, '#1B2A4A', ' rx="1.5"') + rect(-8.5, 28.2, 17, 4, '#F7C948', ' rx="1"'));
+  }
+  function firework(cx, cy, r, color, count) {
+    let out = '';
+    const k = count || 14;
+    for (let i = 0; i < k; i++) {
+      const a = i * 2 * Math.PI / k, ca = Math.cos(a), sa = Math.sin(a);
+      out += line(cx + r * 0.3 * ca, cy + r * 0.3 * sa, cx + r * 0.82 * ca, cy + r * 0.82 * sa, color, n(Math.max(0.6, r * 0.045))) + circle(cx + r * ca, cy + r * sa, Math.max(0.6, r * 0.06), color);
+      const b = a + Math.PI / k;
+      out += line(cx + r * 0.2 * Math.cos(b), cy + r * 0.2 * Math.sin(b), cx + r * 0.5 * Math.cos(b), cy + r * 0.5 * Math.sin(b), '#FFFFFF', n(Math.max(0.4, r * 0.03)), ' opacity="0.7"');
+    }
+    return out + circle(cx, cy, r * 0.07, '#FFFFFF');
+  }
+  // A party popper with its mouth at (mx, my), firing up and to the right.
+  function popper(mx, my) {
+    const cols = [PINK, YELLOW, TEAL, PURPLE, BLUE, CORAL, GREEN];
+    let out = '';
+    [[-92, 92, PINK], [-70, 108, TEAL], [-48, 96, YELLOW], [-28, 84, PURPLE], [-10, 66, CORAL]].forEach(([deg, len, c], i) => {
+      const a = deg * Math.PI / 180, ex = mx + len * Math.cos(a), ey = my + len * Math.sin(a), px = -Math.sin(a), py = Math.cos(a), w = (i % 2 ? 1 : -1) * 12;
+      out += '<path d="M' + n(mx) + ',' + n(my) + ' C' + n(mx + len * 0.33 * Math.cos(a) + px * w) + ',' + n(my + len * 0.33 * Math.sin(a) + py * w) + ' ' + n(mx + len * 0.66 * Math.cos(a) - px * w) + ',' + n(my + len * 0.66 * Math.sin(a) - py * w) + ' ' + n(ex) + ',' + n(ey) + '" stroke="' + c + '" stroke-width="1.7" fill="none" stroke-linecap="round"/>';
+    });
+    out += scatter(88, 95, 0, 0, 1, 1, (u, v, t, i) => {
+      const a = (-118 + u * 128) * Math.PI / 180, dist = 22 + v * 112, x = mx + dist * Math.cos(a), y = my + dist * Math.sin(a), c = cols[i % cols.length], k = 0.9 + dist / 110;
+      if (x < 2 || x > W - 2 || y < 2) return '';
+      if (i % 4 === 0) return star(x, y, 1.6 * k, c);
+      if (i % 4 === 1) return circle(x, y, 1.1 * k, c);
+      if (i % 4 === 2) return rect(x - 1.8 * k, y - 0.7 * k, 3.6 * k, 1.4 * k, c, ' rx="0.4" transform="rotate(' + n(t * 180) + ' ' + n(x) + ' ' + n(y) + ')"');
+      return '<path d="M' + n(x - 2.2 * k) + ',' + n(y) + ' q' + n(1.1 * k) + ',' + n(-1.6 * k) + ' ' + n(2.2 * k) + ',0 t' + n(2.2 * k) + ',0" stroke="' + c + '" stroke-width="' + n(0.8 * k) + '" fill="none" stroke-linecap="round" transform="rotate(' + n(t * 360) + ' ' + n(x) + ' ' + n(y) + ')"/>';
+    });
+    // the cone, tip down and to the left
+    out += g('translate(' + n(mx) + ',' + n(my) + ') rotate(-52)',
+      path('M-15,0 L15,0 L0,46Z', PURPLE) + path('M-15,0 L-5,0 L-1.7,41 L0,46Z', '#6A4CC4') +
+      path('M-10.2,14.6 L10.2,14.6 L7.6,22.6 L-7.6,22.6Z', YELLOW) + path('M-5.2,30 L5.2,30 L2.6,38 L-2.6,38Z', PINK) +
+      ellipse(0, 0, 15, 4.6, '#4B339A') + ellipse(0, -0.4, 11.5, 3, '#2F1F6B'));
+    return out;
+  }
+  function house(cx, cy, s) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') scale(' + n(s) + ')',
+      ellipse(0, 33, 44, 4, 'rgba(20,80,60,0.18)') +
+      rect(15, -42, 9, 20, '#C95F49') + rect(13.5, -44, 12, 4, '#B24E3A', ' rx="1"') +
+      rect(-30, -14, 60, 46, '#FFF7EA') + rect(-30, -14, 60, 4, '#F1E3CC') +
+      path('M-39,-11 L0,-46 L39,-11 L33,-11 L0,-39 L-33,-11Z', '#C95F49') + path('M-33,-11 L0,-39 L33,-11Z', '#E2725B') +
+      heart(0, -22, 1.0, '#FFFFFF') +
+      path('M-7.5,32 L-7.5,13 A7.5,7.5 0 0 1 7.5,13 L7.5,32Z', '#12897D') + circle(4.4, 21, 1.1, '#FFE08A') +
+      rect(-24.5, -3, 12.5, 13, '#BFE6F2', ' rx="1"') + rect(12, -3, 12.5, 13, '#BFE6F2', ' rx="1"') +
+      line(-18.25, -3, -18.25, 10, '#FFFFFF', 1) + line(-24.5, 3.5, -12, 3.5, '#FFFFFF', 1) + line(18.25, -3, 18.25, 10, '#FFFFFF', 1) + line(12, 3.5, 24.5, 3.5, '#FFFFFF', 1) +
+      rect(-25.5, 10, 14.5, 2.2, '#E2725B', ' rx="1"') + rect(11, 10, 14.5, 2.2, '#E2725B', ' rx="1"') +
+      circle(-36, 26, 8, '#5DB075') + circle(-28.5, 28.5, 5.5, '#7CC48F') + circle(36, 26, 8, '#5DB075') + circle(28.5, 28.5, 5.5, '#7CC48F'));
+  }
+  function car(cx, cy, s) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') scale(' + n(s) + ')',
+      ellipse(0, 17, 44, 3, 'rgba(0,0,0,0.25)') +
+      path('M-22,-6 C-18,-21 -9,-24 4,-24 C15,-24 21,-17 27,-6Z', '#E5383B') +
+      path('M-16.5,-6.5 C-13.5,-17.5 -8,-19.8 0,-19.8 L0,-6.5Z', '#CFEFFF') + path('M3.2,-19.8 C12,-19.8 16.5,-14.5 21,-6.5 L3.2,-6.5Z', '#CFEFFF') +
+      path('M-34,-7 L30,-7 C38,-6 41,-1 41,5 L41,9 C41,11 39.5,12 38,12 L-36,12 C-38.5,12 -40,10.5 -40,8 L-40,0 C-40,-4 -38,-7 -34,-7Z', '#E5383B') +
+      path('M-40,4 L41,4 L41,9 C41,11 39.5,12 38,12 L-36,12 C-38.5,12 -40,10.5 -40,8Z', '#C92A2D') +
+      rect(36.5, -2.5, 4.5, 4, '#FFE08A', ' rx="1.5"') + rect(-40, -2, 3, 4, '#FF9F9F', ' rx="1"') + rect(-3, -1.5, 6, 1.6, '#B92B2E', ' rx="0.8"') +
+      circle(-22, 12, 8, '#2B2B33') + circle(-22, 12, 3.6, '#D7DCE3') + circle(22, 12, 8, '#2B2B33') + circle(22, 12, 3.6, '#D7DCE3'));
+  }
+  function lPlate(cx, cy, s, rot) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') rotate(' + n(rot) + ') scale(' + n(s) + ')',
+      rect(-8.6, -8.2, 18, 18, 'rgba(0,0,0,0.15)', ' rx="1.6"') + rect(-9, -9, 18, 18, '#FFFFFF', ' rx="1.6"') +
+      rect(-4.2, -6, 3.6, 12, '#E5383B') + rect(-4.2, 2.4, 9, 3.6, '#E5383B'));
+  }
+  function tick(cx, cy, r) {
+    return burst(cx, cy, r, r * 0.84, 18, '#3BB273') + circle(cx, cy, r * 0.7, '#FFFFFF', ' opacity="0.18"') +
+      path('M' + n(cx - r * 0.38) + ',' + n(cy + r * 0.02) + ' L' + n(cx - r * 0.08) + ',' + n(cy + r * 0.32) + ' L' + n(cx + r * 0.42) + ',' + n(cy - r * 0.28), 'none', ' stroke="#FFFFFF" stroke-width="' + n(r * 0.2) + '" stroke-linecap="round" stroke-linejoin="round"');
+  }
+  function rocket(cx, cy, s, rot) {
+    return g('translate(' + n(cx) + ',' + n(cy) + ') rotate(' + n(rot) + ') scale(' + n(s) + ')',
+      path('M-6.5,20 C-9,31 -2.5,36 0,46 C2.5,36 9,31 6.5,20Z', '#FFB703') + path('M-3.4,20 C-4.6,27 -1.2,30 0,36 C1.2,30 4.6,27 3.4,20Z', '#FFF1B8') +
+      path('M-9,6 L-21,25 L-8.6,20.5Z', '#FF5C6C') + path('M9,6 L21,25 L8.6,20.5Z', '#FF5C6C') +
+      path('M0,-31 C12,-19 13.5,6 9,21 L-9,21 C-13.5,6 -12,-19 0,-31Z', '#FFFFFF') + path('M0,-31 C12,-19 13.5,6 9,21 L3,21 C7,6 7,-16 0,-31Z', '#E4EAF7') +
+      path('M0,-31 C5.4,-25.6 8.8,-18.6 10.2,-12 L-10.2,-12 C-8.8,-18.6 -5.4,-25.6 0,-31Z', '#FF5C6C') +
+      circle(0, -1, 6.6, '#C9D6F2') + circle(0, -1, 4.9, '#4D96FF') + path('M-3.2,-2.6 A3.6,3.6 0 0 1 0.4,-4.6', 'none', ' stroke="#FFFFFF" stroke-width="1" stroke-linecap="round" opacity="0.8"') +
+      rect(-9.6, 17, 19.2, 4, '#C9D6F2', ' rx="1"'));
+  }
+  const goldStars = (seed, count, skip) => scatter(seed, count, -2, -2, W + 2, H + 2, (x, y, t, i) => (skip && skip(x, y)) ? '' : (i % 3 ? star(x, y, 1 + t * 2.6, i % 2 ? '#FFD166' : '#F2B63C', { opacity: n(0.55 + t * 0.45) }) : circle(x, y, 0.4 + t * 0.6, '#FFFFFF', ' opacity="0.8"')));
+
+  /* ---------- 1. Confetti Pop (photo) ---------- */
+  add({
+    id: 'cg-confetti', name: 'Confetti Pop', kind: 'photo', slots: ['p1'], accent: '#1B2A4A',
+    sample: { photos: { p1: 'jumper' }, names: 'Aisha', fields: { reason: 'on your new job' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg(NAVY),
+        photos: [{ id: 'p1', x: -1.5, y: -1.5, w: W + 3, h: 148 }],
+        fg: () => path('M-3,141 C28,132 58,147 90,139 C116,132.5 134,142 152,136 L152,213 L-3,213Z', NAVY) +
+          path('M-3,141 C28,132 58,147 90,139 C116,132.5 134,142 152,136', 'none', ' stroke="' + GOLD + '" stroke-width="1.3"') +
+          confetti(52, 80, -2, 128, W + 2, H + 2, PARTY, (x, y) => x > 14 && x < 134 && y > 151 && y < 201, 1.15) +
+          confetti(53, 46, -2, -2, W + 2, 46, PARTY, (x, y) => Math.abs(x - CX) < 42 + (46 - y) * 0.2, 1.4),
+        texts: [
+          T.chunky(greet, 151, 24, '#FFD166', { x: 14, w: W - 28 }),
+          T.caps(reason, 176.5, 7, '#FFFFFF'),
+          T.round(names, 184, 17, '#FFFFFF', { x: 16, w: W - 32 })
+        ]
+      },
+      back: backPanel('#1B2A4A', confetti(5, 12, CX - 8, 142, CX + 8, 154, [GOLD, PINK, TEAL, NAVY])),
+      insideLeft, insideRight: inside('#1B2A4A', confetti(9, 22, CX - 14, 28, CX + 14, 46, [GOLD, PINK, TEAL, NAVY]))
+    }
+  });
+
+  /* ---------- 2. Rosette (photo) ---------- */
+  add({
+    id: 'cg-rosette', name: 'Rosette', kind: 'photo', slots: ['p1'], accent: '#2D6CDF',
+    sample: { photos: { p1: 'son' }, names: 'Daniel', greeting: 'Well Done', fields: { reason: 'star of the week' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => rays(CX, 68, 32, '#FFF4D2', '#FFEAB3') +
+          path('M' + n(CX - 24) + ',96 L' + n(CX - 38) + ',146 L' + n(CX - 26) + ',138.5 L' + n(CX - 15) + ',148 L' + n(CX - 2) + ',100Z', '#2D6CDF') +
+          path('M' + n(CX + 24) + ',96 L' + n(CX + 38) + ',146 L' + n(CX + 26) + ',138.5 L' + n(CX + 15) + ',148 L' + n(CX + 2) + ',100Z', '#1F55B8') +
+          burst(CX + 1.5, 70.5, 55, 49, 30, 'rgba(60,40,0,0.18)') + burst(CX, 68, 55, 49, 30, '#2D6CDF') + burst(CX, 68, 49, 44.5, 30, '#4D8BFF', null, null, -84) +
+          circle(CX, 68, 43, '#F2B63C') + circle(CX, 68, 40.4, '#FFFFFF'),
+        photos: [{ id: 'p1', x: CX - 38, y: 30, w: 76, h: 76, shape: 'circle' }],
+        fg: () => star(18, 24, 4.5, '#F2B63C') + star(130, 30, 3.6, '#F2B63C') + star(14, 120, 3.4, '#F2B63C') + star(134, 114, 4.6, '#F2B63C'),
+        texts: [
+          T.script(greet, 150, 24, '#2D6CDF', { size: 16 }),
+          T.caps(reason, 175.5, 7, '#B07D1C'),
+          T.round(names, 183, 18, NAVY)
+        ]
+      },
+      back: backPanel('#2D6CDF', burst(CX, 148, 7, 5.6, 16, '#2D6CDF') + circle(CX, 148, 4, '#F2B63C')),
+      insideLeft, insideRight: inside('#2D6CDF', burst(CX, 38, 11, 9, 18, '#2D6CDF') + circle(CX, 38, 6.4, '#F2B63C') + star(CX, 38, 3.4, '#FFFFFF'))
+    }
+  });
+
+  /* ---------- 3. Graduation Day (photo) ---------- */
+  add({
+    id: 'cg-grad', name: 'Graduation Day', kind: 'photo', slots: ['p1'], accent: '#27375E',
+    sample: { photos: { p1: 'yourphoto' }, names: 'Dr Rahman', fields: { reason: 'on your graduation' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#EEF1FF') + scatter(19, 30, -2, -2, W + 2, H + 2, (x, y, t, i) => (x > 14 && x < 134 && y > 26 && y < 200) ? '' : star(x, y, 1.2 + t * 2, i % 2 ? '#F2B63C' : '#C9D0F0')) +
+          mat(20, 36, 108.5, 98, 5, 'rgba(30,40,90,0.18)'),
+        photos: [{ id: 'p1', x: 20, y: 36, w: 108.5, h: 98, shape: 'rect', r: 5 }],
+        fg: () => cap(36, 34, 1.55, -14) + scroll(116, 133, 1.25, -18),
+        texts: [
+          T.serif(greet, 143, 22, NAVY),
+          T.caps(reason, 166.5, 7, '#5B6AA8'),
+          T.round(names, 174, 19, '#27375E', { size: 11 })
+        ]
+      },
+      back: backPanel('#27375E', cap(CX - 2, 148, 0.42, -8)),
+      insideLeft, insideRight: inside('#27375E', cap(CX - 2, 38, 0.72, -8))
+    }
+  });
+
+  /* ---------- 4. Gold Stars (photo) ---------- */
+  (function () {
+    const P = polaroid(74.25, 80, 104, 124, 3), win = P.at(0, -10), cp = P.at(0, 49);
+    add({
+      id: 'cg-stars', name: 'Gold Stars', kind: 'photo', slots: ['p1'], accent: '#9A7526', namesLabel: 'Words on the photo', namesPlaceholder: 'e.g. Well done, Maya!',
+      sample: { photos: { p1: 'girl' }, names: 'So proud of you, Maya!', fields: { reason: 'on your exam results' } },
+      panels: {
+        front: {
+          extraLeft: 1.5,
+          bg: () => '<defs><radialGradient id="cgn" cx="50%" cy="40%" r="80%"><stop offset="0" stop-color="#263A6B"/><stop offset="1" stop-color="#111A36"/></radialGradient></defs>' + bg('url(#cgn)') +
+            goldStars(45, 80, (x, y) => (x > 10 && x < 138 && y > 154 && y < 200)) + P.frame('#FFFFFF', 'rgba(0,0,0,0.38)'),
+          photos: [{ id: 'p1', x: win.x - 46, y: win.y - 46, w: 92, h: 92, rot: 3 }],
+          fg: () => star(P.at(-50, -60).x, P.at(-50, -60).y, 8, '#FFD166') + star(P.at(51, 60).x, P.at(51, 60).y, 6, '#F2B63C'),
+          texts: [
+            { box: true, x: cp.x - 46, y: cp.y - 9.5, w: 92, h: 19, size: 10.5, minSize: 4, lines: 2, lineHeight: 1.02, font: 'Dancing Script', weight: 700, color: '#2F2B28', rot: 3, value: names },
+            T.script(greet, 156, 28, '#FFD166', { size: 17 }),
+            T.caps(reason, 187, 7, '#FFFFFF')
+          ]
+        },
+        back: backPanel('#9A7526', star(CX, 148, 5, '#F2B63C')),
+        insideLeft, insideRight: inside('#9A7526', star(CX - 10, 41, 3, '#F2B63C') + star(CX, 36, 5.4, '#F2B63C') + star(CX + 10, 41, 3, '#F2B63C'))
+      }
+    });
+  })();
+
+  /* ---------- 5. Balloon Arch (photo) ---------- */
+  add({
+    id: 'cg-balloons', name: 'Balloon Arch', kind: 'photo', slots: ['p1'], accent: '#D9347A',
+    sample: { photos: { p1: 'dad' }, names: 'Dad', greeting: 'You Did It!', fields: { reason: 'happy retirement' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#FFF4FA') + confetti(64, 40, -2, 100, W + 2, H + 2, [PINK, YELLOW, TEAL, PURPLE], (x, y) => (x > 30 && x < 118 && y < 142) || (x > 12 && x < 136 && y > 146 && y < 201)) +
+          path(archPath(CX - 39.4, 35.4, 82, 140.6), 'rgba(120,20,70,0.14)') + path(archPath(CX - 41.5, 32.5, 83, 141), '#FFFFFF'),
+        photos: [{ id: 'p1', x: CX - 39.5, y: 34.5, w: 79, h: 105, shape: 'arch' }],
+        fg: () => {
+          const cols = [PINK, YELLOW, TEAL, PURPLE, BLUE, CORAL, '#FF9DB8', GREEN];
+          let out = '';
+          [[198, 55, 9], [215, 52, 11], [234, 54, 9.5], [252, 52, 12], [270, 55, 10], [288, 52, 12], [306, 54, 9.5], [325, 52, 11], [342, 55, 9],
+            [206, 64, 7], [243, 63, 7.5], [279, 65, 7], [315, 63, 7.5], [188, 60, 7.5], [352, 60, 7.5]].forEach(([deg, rad, r], i) => {
+            const a = deg * Math.PI / 180;
+            out += balloon(CX + rad * Math.cos(a), 76 + rad * Math.sin(a), r, cols[i % cols.length]);
+          });
+          return out + balloon(CX - 53, 96, 8.5, YELLOW) + balloon(CX + 53, 96, 8.5, TEAL) + balloon(CX - 56, 114, 6.5, PURPLE) + balloon(CX + 56, 114, 6.5, PINK);
+        },
+        texts: [
+          T.chunky(greet, 147, 25, '#D9347A'),
+          T.caps(reason, 173.5, 7, PURPLE),
+          T.round(names, 181, 19, NAVY)
+        ]
+      },
+      back: backPanel('#D9347A', balloon(CX, 147, 4, PINK)),
+      insideLeft, insideRight: inside('#D9347A', balloon(CX - 8, 37, 5, YELLOW) + balloon(CX, 33, 6, PINK) + balloon(CX + 8, 37, 5, TEAL))
+    }
+  });
+
+  /* ---------- 6. Trophy (no photo) ---------- */
+  add({
+    id: 'cg-trophy', name: 'Trophy', kind: 'words', slots: [], accent: '#0E8C9A',
+    sample: { names: 'Team Cedar Road', greeting: 'Well Done', fields: { reason: 'league champions' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => rays(CX, 76, 28, '#17B6C6', '#11A5B5') +
+          confetti(71, 70, -2, -2, W + 2, 136, ['#FFFFFF', YELLOW, PINK, '#B8F1F6'], (x, y) => Math.abs(x - CX) < 42 && y > 14 && y < 132, 1.4) +
+          sparkle(26, 44, 5, '#FFFFFF') + sparkle(124, 36, 6.5, '#FFFFFF') + sparkle(118, 108, 4, '#FFFFFF') + sparkle(30, 112, 3.6, '#FFFFFF') +
+          trophy(CX, 72, 1.75),
+        texts: [
+          T.chunky(greet, 142, 28, '#FFFFFF', { shadow: { dx: 0.6, dy: 0.8, color: 'rgba(8,60,70,0.55)' } }),
+          T.caps(reason, 171.5, 7, '#FFFFFF'),
+          T.round(names, 179, 20, '#FFE89A', { size: 11 })
+        ]
+      },
+      back: backPanel('#0E8C9A', trophy(CX, 146, 0.24)),
+      insideLeft, insideRight: inside('#0E8C9A', trophy(CX, 36, 0.42))
+    }
+  });
+
+  /* ---------- 7. Fireworks (no photo) ---------- */
+  add({
+    id: 'cg-fireworks', name: 'Fireworks', kind: 'words', slots: [], accent: '#3A1C71',
+    sample: { names: 'Mr & Mrs Adeyemi', fields: { reason: 'on your engagement' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><linearGradient id="cgf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161042"/><stop offset="1" stop-color="#43207D"/></linearGradient></defs>' + bg('url(#cgf)') +
+          scatter(27, 70, -2, -2, W + 2, H + 2, (x, y, t) => circle(x, y, 0.25 + t * 0.5, '#FFFFFF', ' opacity="' + n(0.3 + t * 0.6) + '"')) +
+          firework(42, 46, 30, '#FFD166', 16) + firework(110, 34, 21, '#FF7AA2', 14) + firework(98, 92, 31, '#5EE0D2', 16) + firework(30, 104, 18, '#C3A9FF', 12) + firework(128, 124, 12, '#FFFFFF', 10),
+        texts: [
+          T.script(greet, 134, 32, '#FFFFFF', { shadow: { dx: 0.5, dy: 0.7, color: 'rgba(10,0,40,0.6)' } }),
+          T.caps(reason, 168, 7, '#FFD166'),
+          T.round(names, 176, 20, '#FFD166', { size: 10.5 })
+        ]
+      },
+      back: backPanel('#3A1C71', firework(CX, 148, 8, '#3A1C71', 10)),
+      insideLeft, insideRight: inside('#3A1C71', firework(CX, 38, 12, '#7B5CD6', 12))
+    }
+  });
+
+  /* ---------- 8. Party Popper (no photo) ---------- */
+  add({
+    id: 'cg-popper', name: 'Party Popper', kind: 'words', slots: [], accent: '#6A4CC4',
+    sample: { names: 'Sana', greeting: 'You Did It!', fields: { reason: 'on your exam results' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#FFFDF5') + popper(40, 104),
+        texts: [
+          T.chunky(greet, 147, 26, '#6A4CC4'),
+          T.caps(reason, 174.5, 7, '#D9347A'),
+          T.round(names, 182, 19, NAVY, { size: 11 })
+        ]
+      },
+      back: backPanel('#6A4CC4', confetti(5, 12, CX - 8, 142, CX + 8, 154, [PINK, YELLOW, TEAL, PURPLE])),
+      insideLeft, insideRight: inside('#6A4CC4', star(CX - 10, 41, 3, YELLOW) + star(CX, 36, 5, PINK) + star(CX + 10, 41, 3, TEAL))
+    }
+  });
+
+  /* ---------- 9. New Home (no photo) ---------- */
+  add({
+    id: 'cg-home', name: 'New Home', kind: 'words', slots: [], accent: '#12897D',
+    sample: { names: 'Hannah & Tom', fields: { reason: 'on your new home' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#E3F4FB') + sun(24, 26, 8, YELLOW, '#FFB703') + cloud(130, 44, 0.7, '#FFFFFF') + cloud(36, 58, 0.6, '#FFFFFF') +
+          path('M-3,128 C30,116 60,122 92,118 C118,115 136,122 152,118 L152,213 L-3,213Z', '#CDEBD3') +
+          path('M-3,140 C36,132 70,138 104,134 C126,132 140,136 152,134 L152,213 L-3,213Z', '#E9F7EC') +
+          heart(97, 37, 0.5, '#FF7AA2') + heart(103, 27, 0.75, '#FF5C8A') + heart(96, 15, 1.0, '#FF9DB8') +
+          house(CX, 92, 1.12),
+        texts: [
+          T.script(greet, 147, 25, '#12897D', { size: 16 }),
+          T.caps(reason, 173.5, 7, '#3B7D69'),
+          T.round(names, 181, 19, '#27413B', { size: 11 })
+        ]
+      },
+      back: backPanel('#12897D', house(CX, 146, 0.22)),
+      insideLeft, insideRight: inside('#12897D', house(CX, 34, 0.36))
+    }
+  });
+
+  /* ---------- 10. You Passed (no photo) ---------- */
+  add({
+    id: 'cg-passed', name: 'You Passed', kind: 'words', slots: [], accent: '#C92A2D',
+    sample: { names: 'Zain', greeting: 'You Did It!', fields: { reason: 'on passing your driving test' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => bg('#DDF2FF') + sun(126, 24, 8, YELLOW, '#FFB703') + cloud(34, 26, 0.9, '#FFFFFF') + cloud(92, 46, 0.6, '#FFFFFF') +
+          ellipse(30, 112, 60, 22, '#BFE3C6') + ellipse(124, 114, 54, 20, '#A9D8B2') +
+          rect(-3, 108, W + 6, 30, '#4A5568') + rect(-3, 108, W + 6, 1.6, '#FFFFFF', ' opacity="0.7"') + rect(-3, 136.4, W + 6, 1.6, '#FFFFFF', ' opacity="0.7"') +
+          [0, 1, 2, 3, 4].map(i => rect(4 + i * 32, 122, 17, 2, '#FFE08A', ' rx="1"')).join('') +
+          rect(-3, 138, W + 6, 76, '#FFFDF5') +
+          line(4, 96, 20, 96, '#FFFFFF', 1.4) + line(8, 103, 26, 103, '#FFFFFF', 1.4) + line(2, 110, 16, 110, '#FFFFFF', 1.4) +
+          car(CX + 4, 106, 1.22) + lPlate(30, 66, 1.15, -18) + tick(116, 70, 13) +
+          line(16, 80, 20, 86, '#E5383B', 1) + line(40, 82, 37, 88, '#E5383B', 1) + line(28, 84, 28, 90, '#E5383B', 1),
+        texts: [
+          T.chunky(greet, 146, 26, '#E5383B'),
+          T.caps(reason, 173.5, 7, '#4A5568'),
+          T.round(names, 181, 19, NAVY, { size: 11 })
+        ]
+      },
+      back: backPanel('#C92A2D', lPlate(CX, 147, 0.5, -8)),
+      insideLeft, insideRight: inside('#C92A2D', car(CX, 34, 0.36))
+    }
+  });
+
+  /* ---------- 11. Hats Off (no photo) ---------- */
+  add({
+    id: 'cg-hats', name: 'Hats Off', kind: 'words', slots: [], accent: '#27375E',
+    sample: { names: 'Class of ' + D.nextYear, fields: { reason: 'you made it' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><linearGradient id="cgh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD98F"/><stop offset="1" stop-color="#FFF1D6"/></linearGradient></defs>' + bg('url(#cgh)') +
+          confetti(83, 60, -2, -2, W + 2, 134, ['#FFFFFF', '#F2B63C', '#FF7AA2', '#4D96FF'], null, 1.3) +
+          path('M30,118 C26,96 28,74 36,56', 'none', ' stroke="#27375E" stroke-width="0.8" stroke-dasharray="1.5 3" stroke-linecap="round" opacity="0.35"') +
+          path('M76,124 C78,96 82,70 88,46', 'none', ' stroke="#27375E" stroke-width="0.8" stroke-dasharray="1.5 3" stroke-linecap="round" opacity="0.35"') +
+          path('M118,122 C122,104 122,90 118,76', 'none', ' stroke="#27375E" stroke-width="0.8" stroke-dasharray="1.5 3" stroke-linecap="round" opacity="0.35"') +
+          cap(38, 44, 1.5, -22) + cap(90, 32, 1.75, 14) + cap(118, 66, 1.25, 30) + cap(58, 88, 1.35, 8) + cap(104, 108, 1.05, -26) + cap(24, 100, 0.95, 20) +
+          star(64, 20, 3.4, '#FFFFFF') + star(132, 26, 4, '#FFFFFF') + star(14, 70, 3, '#FFFFFF') + star(80, 66, 3.6, '#FFFFFF') + star(136, 100, 3, '#FFFFFF'),
+        texts: [
+          T.serif(greet, 139, 26, NAVY),
+          T.caps(reason, 167, 7, '#B5573A'),
+          T.round(names, 175, 21, '#27375E', { size: 11.5 })
+        ]
+      },
+      back: backPanel('#27375E', scroll(CX, 148, 0.5, -10)),
+      insideLeft, insideRight: inside('#27375E', cap(CX - 2, 38, 0.72, -8))
+    }
+  });
+
+  /* ---------- 12. Rocket (no photo) ---------- */
+  add({
+    id: 'cg-rocket', name: 'Rocket', kind: 'words', slots: [], accent: '#243B8A',
+    sample: { names: 'Onwards and upwards, Kofi', greeting: 'So Proud of You', fields: { reason: 'on your new job' } },
+    panels: {
+      front: {
+        extraLeft: 1.5,
+        bg: () => '<defs><radialGradient id="cgr" cx="60%" cy="30%" r="90%"><stop offset="0" stop-color="#2E4BB0"/><stop offset="1" stop-color="#0E1846"/></radialGradient></defs>' + bg('url(#cgr)') +
+          scatter(91, 80, -2, -2, W + 2, H + 2, (x, y, t, i) => (y > 136 && y < 200 && x > 8 && x < 140) ? '' : i % 9 === 0 ? sparkle(x, y, 1.6 + t * 2, '#FFE08A') : circle(x, y, 0.3 + t * 0.6, '#FFFFFF', ' opacity="' + n(0.35 + t * 0.6) + '"')) +
+          circle(26, 30, 11, '#FF9F6B') + path('M16.4,24.6 A11,11 0 0 1 36.6,27.6 C30,25 22,24 16.4,24.6Z', '#FFB98F') + ellipse(26, 30, 18, 4, 'none', ' stroke="#FFE08A" stroke-width="1.3" transform="rotate(-18 26 30)"') +
+          circle(126, 112, 6, '#B8F1F6') + circle(124, 110, 1.4, '#8FDCE4') + circle(128, 114, 1, '#8FDCE4') +
+          [[28, 124, 9, 0.95], [38, 116, 8, 0.9], [46, 106, 7, 0.82], [36, 128, 6, 0.9], [50, 114, 5.4, 0.75], [56, 100, 5, 0.6], [22, 114, 6, 0.8], [62, 92, 3.6, 0.45]].map(([x, y, r, o]) => circle(x, y, r, '#FFFFFF', ' opacity="' + o + '"')).join('') +
+          rocket(86, 62, 1.5, 38),
+        texts: [
+          T.chunky(greet, 139, 28, YELLOW, { shadow: { dx: 0.6, dy: 0.8, color: 'rgba(5,10,40,0.6)' } }),
+          T.caps(reason, 168.5, 7, '#BFD0FF'),
+          T.round(names, 176, 21, '#FFFFFF', { size: 10.5 })
+        ]
+      },
+      back: backPanel('#243B8A', rocket(CX, 146, 0.28, 30)),
+      insideLeft, insideRight: inside('#243B8A', rocket(CX, 36, 0.42, 30))
+    }
+  });
+})(window);
 </script>
 <script>
 /* Perfect Digital photo card maker: page logic. */
@@ -4454,7 +5254,9 @@ footer b { color: var(--ink); }
     invitation: { kind: 'packs', options: PACKS, chips: PACK_CHIPS.concat(['Ready the next working day']) },
     baby: { kind: 'packs', options: [SINGLE].concat(PACKS), chips: ['<strong>£5</strong> a card'].concat(PACK_CHIPS) },
     wedding: { kind: 'packs', options: [SINGLE].concat(PACKS), chips: ['<strong>£5</strong> a card'].concat(PACK_CHIPS) },
-    anniversary: EACH
+    anniversary: EACH,
+    thankyou: { kind: 'packs', options: [SINGLE].concat(PACKS), chips: ['<strong>£5</strong> a card'].concat(PACK_CHIPS) },
+    congrats: EACH
   };
   // Christmas packs have to be printed before Christmas: last orders 18 December (UK time, inclusive), every year.
   // After that the Christmas tab offers single cards only, still printed while you wait. Code.gs checks the same date.
@@ -4504,7 +5306,7 @@ footer b { color: var(--ink); }
     const month = new Date().getMonth();
     const seg = $('occasion-seg');
     seg.innerHTML = D.OCCASION_ORDER.filter(o => { const m = D.OCCASIONS[o].months; return !m || m.indexOf(month) >= 0 || o === occasion; })
-      .map(o => '<button type="button" data-o="' + o + '" aria-pressed="false">' + D.OCCASIONS[o].label + '</button>').join('');
+      .map(o => '<button type="button" data-o="' + o + '" aria-pressed="false">' + (D.OCCASIONS[o].tab || D.OCCASIONS[o].label) + '</button>').join('');
     for (const b of seg.children) b.addEventListener('click', () => { if (b.dataset.o !== occasion) setOccasion(b.dataset.o, true); });
   }
 
