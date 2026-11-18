@@ -184,6 +184,8 @@ p { margin: 0; }
 .print { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--print); box-shadow: var(--shadow); overflow: hidden; border-radius: 2px; }
 .print img { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
 .print.fit img { object-fit: contain; }
+/* "Fill the print": the photo is placed so the frame shows exactly the part that prints (zoom and position). */
+.print img.crop, .frame img.crop { position: absolute; max-width: none; object-fit: fill; }
 .print.loading, .print.broken { display: grid; place-items: center; text-align: center; padding: 8px; font-size: var(--s-1); }
 .print.loading { background: var(--line); color: var(--muted); }
 .print.broken { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
@@ -275,6 +277,10 @@ input[type="text"]:focus, input[type="tel"]:focus, input[type="email"]:focus, se
 .frame.fit img { object-fit: contain; }
 .ed-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
 .ed-grid .wide { grid-column: 1 / -1; }
+.zoomrow { display: flex; align-items: center; gap: 10px; }
+.zoomrow input[type="range"] { flex: 1 1 auto; min-width: 0; height: 44px; margin: 0; accent-color: var(--action); cursor: pointer; }
+.zoomrow button { flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--ink); font: 600 22px/1 var(--body); cursor: pointer; }
+.zoomrow button[disabled] { opacity: .35; cursor: default; }
 .warnbox { font-size: var(--s-1); font-weight: 600; padding: 8px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
 .warnbox.bad { background: var(--bad-bg); color: var(--bad); }
 .ed-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
@@ -343,7 +349,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       <h2>How it works</h2>
       <ol class="how">
         <li><span><b>Choose your photos</b><span class="muted">Pick them straight from your phone's gallery.</span></span></li>
-        <li><span><b>Check each print</b><span class="muted">We crop every photo to the print size. Tap a photo to move the crop, change the size or add copies. You can mix sizes in one order.</span></span></li>
+        <li><span><b>Check each print</b><span class="muted">We crop every photo to the print size. Tap a photo to zoom in or move the crop, change the size or add copies. You can mix sizes in one order.</span></span></li>
         <li><span><b>Collect and pay</b><span class="muted">We print them while you wait if you're in the shop, or have them ready for you to collect.</span></span></li>
       </ol>
     </div>
@@ -357,7 +363,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     </div>
     <div class="hero">
       <h2 id="check-title">Check your prints</h2>
-      <p class="muted">Tap a photo to move the crop, change its size or add copies.</p>
+      <p class="muted">Tap a photo to zoom in or move the crop, change its size or add copies.</p>
     </div>
 
     <div class="panel settings">
@@ -481,7 +487,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
         <button class="btn btn-primary btn-small" type="button" id="ed-done">Done</button>
       </div>
     </div>
-    <div class="stage" id="ed-stage"><div class="frame" id="ed-frame" tabindex="0" aria-label="Print preview. Drag or use the arrow keys to move the photo."><img id="ed-img" alt=""></div></div>
+    <div class="stage" id="ed-stage"><div class="frame" id="ed-frame" tabindex="0" aria-label="Print preview. Drag or use the arrow keys to move the photo. Pinch, or press plus and minus, to zoom."><img id="ed-img" alt=""></div></div>
     <p class="hint" id="ed-hint"></p>
     <p class="warnbox" id="ed-warn" hidden></p>
     <div class="ed-grid">
@@ -490,6 +496,14 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
         <div class="seg" id="ed-mode" role="radiogroup" aria-labelledby="ed-mode-label">
           <button type="button" role="radio" data-mode="fill">Fill the print</button>
           <button type="button" role="radio" data-mode="fit">Whole photo</button>
+        </div>
+      </div>
+      <div class="field wide" id="ed-zoom-field">
+        <label class="label" for="ed-zoom">Zoom</label>
+        <div class="zoomrow">
+          <button type="button" id="ed-zoom-out" aria-label="Zoom out">−</button>
+          <input type="range" id="ed-zoom" min="1" max="3" step="0.01" value="1" aria-valuetext="Not zoomed">
+          <button type="button" id="ed-zoom-in" aria-label="Zoom in">+</button>
         </div>
       </div>
       <div class="field">
@@ -541,6 +555,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     JPEG_QUALITY: 0.92,
     SOFT_DPI: 150,                                 // below this a print gets a "may look soft" warning
     LOW_DPI: 100,                                  // below this it gets a "will look blurry" warning
+    ZOOM_MAX: 3,                                   // "Fill the print" can be zoomed in this many times
     CLOSED_WEEKDAYS: [0],                          // 0 = Sunday
     CLOSED_DATES: ['2026-12-25', '2026-12-26', '2027-01-01'],
     OPEN_HOURS: [10, 19],                          // the shop's hours in London time: 10am to 7pm
@@ -611,13 +626,53 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   const modeOf = p => p.mode || state.mode;
   const cropOf = p => p.manual || p.auto[aspectKey(p)] || { fx: 0.5, fy: 0.5 };
   function needsCrop(p) { const d = printDims(p); return Math.abs(d.w / d.h - p.w / p.h) > 0.01; }
+  // Zoom (18 Nov 2026). How far "Fill the print" is zoomed in: 1 shows as much of the photo as the print's shape
+  // allows. Only a crop the customer has set by hand carries a zoom.
+  const zoomOf = p => clamp((p.manual && p.manual.z) || 1, 1, CONFIG.ZOOM_MAX);
+  // The part of a photo iw by ih that prints at the shape a (width over height) with the crop c: a window of that
+  // shape, 1/z of the largest that fits, placed by fx and fy (0 to 1 across the room there is to move it).
+  function cropRect(iw, ih, a, c) {
+    const z = clamp(c.z || 1, 1, CONFIG.ZOOM_MAX);
+    let sw = iw, sh = ih;
+    if (iw / ih > a) sw = ih * a; else sh = iw / a;
+    sw /= z; sh /= z;
+    return { sx: clamp(c.fx, 0, 1) * (iw - sw), sy: clamp(c.fy, 0, 1) * (ih - sh), sw, sh, z };
+  }
+  const cropRectOf = p => { const d = printDims(p); return cropRect(p.w, p.h, d.w / d.h, cropOf(p)); };
+  // Whether there is room to move the photo: it is a different shape from the print, or it is zoomed in.
+  const canMove = p => modeOf(p) !== 'fit' && (needsCrop(p) || zoomOf(p) > 1.001);
+  // Sets the zoom, keeping the middle of what is showing in the middle.
+  function setZoom(p, z) {
+    z = Math.round(clamp(z, 1, CONFIG.ZOOM_MAX) * 100) / 100;
+    const d = printDims(p), a = d.w / d.h, c = cropOf(p);
+    const r = cropRect(p.w, p.h, a, c);
+    if (Math.abs(z - r.z) < 0.001) return false;
+    const cx = r.sx + r.sw / 2, cy = r.sy + r.sh / 2;
+    const n = cropRect(p.w, p.h, a, { fx: 0, fy: 0, z });
+    const roomX = p.w - n.sw, roomY = p.h - n.sh;
+    p.manual = {
+      fx: roomX > 0.5 ? clamp((cx - n.sw / 2) / roomX, 0, 1) : c.fx,
+      fy: roomY > 0.5 ? clamp((cy - n.sh / 2) / roomY, 0, 1) : c.fy,
+      z
+    };
+    return true;
+  }
+  // Places a preview picture in its frame: the frame shows exactly the part that prints.
+  function placeImg(img, p) {
+    const fill = modeOf(p) !== 'fit';
+    img.classList.toggle('crop', fill);
+    if (!fill) { img.style.width = img.style.height = img.style.left = img.style.top = ''; return; }
+    const r = cropRectOf(p);
+    img.style.width = (p.w / r.sw * 100) + '%'; img.style.height = (p.h / r.sh * 100) + '%';
+    img.style.left = (-r.sx / r.sw * 100) + '%'; img.style.top = (-r.sy / r.sh * 100) + '%';
+  }
 
   function effectiveDpi(p) {
     const d = printDims(p);
     if (modeOf(p) === 'fit') return Math.min(p.w / d.w, p.h / d.h);
     const a = d.w / d.h;
     const cropW = p.w / p.h > a ? p.h * a : p.w;
-    return cropW / d.w;
+    return cropW / zoomOf(p) / d.w;
   }
   function quality(p) { const dpi = effectiveDpi(p); return dpi < CONFIG.LOW_DPI ? 'bad' : dpi < CONFIG.SOFT_DPI ? 'soft' : 'ok'; }
 
@@ -922,8 +977,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       pr.className = 'print' + (modeOf(p) === 'fit' ? ' fit' : '');
       const img = document.createElement('img');
       img.src = p.thumb; img.alt = ''; img.draggable = false;
-      const c = cropOf(p);
-      img.style.objectPosition = (c.fx * 100) + '% ' + (c.fy * 100) + '%';
+      placeImg(img, p);
       pr.appendChild(img);
       const q = quality(p);
       if (q !== 'ok') {
@@ -947,7 +1001,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     } else {
       const sz = document.createElement('span');
       sz.className = 'tile-size';
-      sz.textContent = sizeById(p.size).name + (modeOf(p) === 'fit' ? ' · whole' : '');
+      sz.textContent = sizeById(p.size).name + (modeOf(p) === 'fit' ? ' · whole' : zoomOf(p) > 1.001 ? ' · zoomed' : '');
       const st = document.createElement('div');
       st.className = 'stepper';
       st.innerHTML = '<button type="button" data-act="minus" aria-label="One fewer copy">−</button><span class="qty"></span><button type="button" data-act="plus" aria-label="One more copy">+</button>';
@@ -1095,14 +1149,19 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     if (img.getAttribute('src') !== p.thumb) img.src = p.thumb;
     const fit = modeOf(p) === 'fit';
     fr.classList.toggle('fit', fit);
-    fr.classList.toggle('locked', fit || !needsCrop(p));
-    const c = cropOf(p);
-    img.style.objectPosition = (c.fx * 100) + '% ' + (c.fy * 100) + '%';
+    fr.classList.toggle('locked', !canMove(p));
+    placeImg(img, p);
+    const z = zoomOf(p), zr = $('ed-zoom');
+    $('ed-zoom-field').hidden = fit;
+    zr.max = String(CONFIG.ZOOM_MAX); zr.value = String(z);
+    zr.setAttribute('aria-valuetext', z > 1.001 ? 'Zoomed in ' + (Math.round(z * 10) / 10) + ' times' : 'Not zoomed');
+    $('ed-zoom-out').disabled = z <= 1.001; $('ed-zoom-in').disabled = z >= CONFIG.ZOOM_MAX - 0.001;
 
     const paperNote = s.papers.includes(state.finish) ? '' : ' ' + s.name + ' prints are on ' + paperFor(s).toLowerCase() + ' paper.';
     $('ed-hint').textContent = (fit
       ? 'The whole photo prints, with white edges where the shapes differ.'
-      : needsCrop(p) ? 'Drag the photo to choose which part is printed.' : 'This photo is the same shape as the print, so nothing is cut off.') + paperNote;
+      : canMove(p) ? 'Drag the photo to choose which part is printed. Use Zoom to go in closer.'
+        : 'This photo is the same shape as the print, so nothing is cut off. Use Zoom to go in closer.') + paperNote;
     const q = quality(p), wb = $('ed-warn');
     wb.hidden = q === 'ok';
     wb.classList.toggle('bad', q === 'bad');
@@ -1192,32 +1251,76 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     $('editor').addEventListener('click', e => { if (e.target === $('editor')) closeEditor(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('editor').hidden) closeEditor(); });
 
+    // Zoom (18 Nov 2026): the slider, its two buttons, a pinch on the photo, Ctrl and the mouse wheel, and + and -.
+    const zoomTo = z => { const p = find(state.editing); if (p && modeOf(p) !== 'fit' && setZoom(p, z)) { renderEditor(); updateTile(p); } };
+    const zoomBy = step => { const p = find(state.editing); if (p) zoomTo(zoomOf(p) + step); };
+    $('ed-zoom').addEventListener('input', e => zoomTo(Number(e.target.value)));
+    $('ed-zoom-out').addEventListener('click', () => zoomBy(-0.25));
+    $('ed-zoom-in').addEventListener('click', () => zoomBy(0.25));
+
     const fr = $('ed-frame');
+    const touches = new Map();   // the fingers (or the mouse) on the photo
+    let pinch = null;
+    const spread = () => { const t = [...touches.values()]; return Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y); };
+    const startDrag = (p, id, x, y) => {
+      const r = fr.getBoundingClientRect(), c = cropRectOf(p);
+      // How far the photo can slide under the frame, in screen pixels, each way.
+      drag = { id, x, y, start: Object.assign({}, cropOf(p)), ox: r.width * (p.w - c.sw) / c.sw, oy: r.height * (p.h - c.sh) / c.sh };
+      fr.classList.add('dragging');
+    };
     fr.addEventListener('pointerdown', e => {
-      const p = find(state.editing); if (!p || modeOf(p) === 'fit' || !needsCrop(p)) return;
-      const r = fr.getBoundingClientRect();
-      const sc = Math.max(r.width / p.w, r.height / p.h);
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: Object.assign({}, cropOf(p)), ox: p.w * sc - r.width, oy: p.h * sc - r.height };
-      fr.setPointerCapture(e.pointerId); fr.classList.add('dragging'); e.preventDefault();
+      const p = find(state.editing); if (!p || modeOf(p) === 'fit') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { fr.setPointerCapture(e.pointerId); } catch (err) { /* the pointer has already gone */ }
+      e.preventDefault();
+      if (touches.size === 2) { drag = null; pinch = { d: spread() || 1, z: zoomOf(p) }; fr.classList.add('dragging'); return; }
+      if (touches.size === 1 && canMove(p)) startDrag(p, e.pointerId, e.clientX, e.clientY);
     });
     fr.addEventListener('pointermove', e => {
-      if (!drag || e.pointerId !== drag.id) return;
+      if (!touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const p = find(state.editing); if (!p) return;
+      if (pinch && touches.size >= 2) {
+        if (setZoom(p, pinch.z * spread() / pinch.d)) { placeImg($('ed-img'), p); $('ed-zoom').value = String(zoomOf(p)); }
+        return;
+      }
+      if (!drag || e.pointerId !== drag.id) return;
       const fx = drag.ox > 0.5 ? clamp(drag.start.fx - (e.clientX - drag.x) / drag.ox, 0, 1) : drag.start.fx;
       const fy = drag.oy > 0.5 ? clamp(drag.start.fy - (e.clientY - drag.y) / drag.oy, 0, 1) : drag.start.fy;
-      p.manual = { fx, fy };
-      $('ed-img').style.objectPosition = (fx * 100) + '% ' + (fy * 100) + '%';
+      p.manual = { fx, fy, z: zoomOf(p) };
+      placeImg($('ed-img'), p);
     });
-    const end = e => { if (!drag || e.pointerId !== drag.id) return; drag = null; fr.classList.remove('dragging'); $('ed-reset').disabled = false; };
+    const end = e => {
+      if (!touches.delete(e.pointerId)) return;
+      const p = find(state.editing);
+      if (pinch) {
+        if (touches.size >= 2) return;
+        pinch = null; drag = null;
+        // One finger is still down after a pinch: it carries on as a drag from where it is.
+        const rest = [...touches.entries()][0];
+        if (p && rest && canMove(p)) startDrag(p, rest[0], rest[1].x, rest[1].y); else fr.classList.remove('dragging');
+        if (p) { renderEditor(); updateTile(p); }
+        return;
+      }
+      if (!drag || e.pointerId !== drag.id) return;
+      drag = null; fr.classList.remove('dragging');
+      if (p) { renderEditor(); updateTile(p); }
+    };
     fr.addEventListener('pointerup', end); fr.addEventListener('pointercancel', end);
+    fr.addEventListener('wheel', e => {
+      if (!e.ctrlKey && !e.metaKey) return;   // a plain wheel still scrolls the sheet
+      e.preventDefault(); zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
+    }, { passive: false });
     fr.addEventListener('keydown', e => {
-      const p = find(state.editing); if (!p || modeOf(p) === 'fit' || !needsCrop(p)) return;
+      const p = find(state.editing); if (!p || modeOf(p) === 'fit') return;
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(0.25); return; }
+      if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(-0.25); return; }
       const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-      if (!k) return;
+      if (!k || !canMove(p)) return;
       e.preventDefault();
       const c = cropOf(p);
-      p.manual = { fx: clamp(c.fx + k[0] * 0.05, 0, 1), fy: clamp(c.fy + k[1] * 0.05, 0, 1) };
-      renderEditor();
+      p.manual = { fx: clamp(c.fx + k[0] * 0.05, 0, 1), fy: clamp(c.fy + k[1] * 0.05, 0, 1), z: zoomOf(p) };
+      renderEditor(); updateTile(p);
     });
     window.addEventListener('resize', () => { if (state.editing) renderEditor(); });
   }
@@ -1348,10 +1451,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       const sc = Math.min(W / iw, H / ih), dw = iw * sc, dh = ih * sc;
       ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
     } else {
-      const a = W / H, ia = iw / ih, cr = cropOf(p);
-      let sx = 0, sy = 0, sw = iw, sh = ih;
-      if (ia > a) { sw = ih * a; sx = cr.fx * (iw - sw); } else { sh = iw / a; sy = cr.fy * (ih - sh); }
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+      const r = cropRect(iw, ih, W / H, cropOf(p));
+      ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, W, H);
     }
     release(img);
     const blob = await canvasBlob(c, 'image/jpeg', CONFIG.JPEG_QUALITY);
