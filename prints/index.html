@@ -454,6 +454,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     <div class="progress" id="progress" hidden>
       <div class="bar"><i id="send-bar"></i></div>
       <span class="small muted" id="send-text">Preparing your prints…</span>
+      <span class="small muted" id="send-keep">Keep this page open until it says sent. If you leave it, sending stops and carries on when you come back.</span>
     </div>
   </section>
 
@@ -553,6 +554,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     MAX_PHOTOS: 150,
     DPI: 300,                                      // print files are made at this resolution
     JPEG_QUALITY: 0.92,
+    SEND_AT_ONCE: 4,                               // print files on their way to the shop at the same time
     SOFT_DPI: 150,                                 // below this a print gets a "may look soft" warning
     LOW_DPI: 100,                                  // below this it gets a "will look blurry" warning
     ZOOM_MAX: 3,                                   // "Fill the print" can be zoomed in this many times
@@ -1508,6 +1510,9 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     } catch (e) {
       if (isLive) sendTimings('failed', whyFailed(e));
       fail(cleanError(e));
+    } finally {
+      state.onBack = null;
+      letSleep();
     }
   }
 
@@ -1559,30 +1564,40 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   // has stalled is given up and tried again instead of waiting for as long as the phone will. Only on the shop's
   // own address; the limit stops the request itself.
   const clock = () => (window.performance && performance.now ? performance.now() : Date.now());
-  function timedOut_() { const e = new Error('timed out'); e.code = 'timeout'; return e; }
-  function runFor(ms, fn, args, keepalive) {
+  function timedOut_(code) { const e = new Error('timed out'); e.code = code || 'timeout'; return e; }
+  // Calls on their way that may be tried again. A phone stops a page that is behind a call, another app or the
+  // lock screen, and what was on its way then is usually lost. When the customer comes back, each of these gets
+  // five more seconds to answer and is then given up and sent again straight away (code 'back', not 'timeout').
+  const flying = new Set();
+  function runFor(ms, fn, args, keepalive, again) {
     if (isAppsScript) {
       return Promise.race([run.apply(null, [fn].concat(args)), new Promise((res, rej) => setTimeout(() => rej(timedOut_()), ms))]);
     }
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    let late = false;
-    const timer = setTimeout(() => { late = true; if (ctl) ctl.abort(); }, ms);
+    let late = '';
+    const stop = code => { late = code; if (ctl) ctl.abort(); };
+    let timer = setTimeout(() => stop('timeout'), ms);
+    const call = { hurry: wait => { clearTimeout(timer); timer = setTimeout(() => stop('back'), wait); } };
+    if (again) flying.add(call);
+    const end = () => { clearTimeout(timer); flying.delete(call); };
     const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) };
     if (ctl) opts.signal = ctl.signal;
     if (keepalive) opts.keepalive = true;
     return fetch(WEB_APP_URL, opts)
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(j => { clearTimeout(timer); if (j.error) throw new Error(j.error); return j.result; },
-            e => { clearTimeout(timer); throw late ? timedOut_() : e; });
+      .then(j => { end(); if (j.error) throw new Error(j.error); return j.result; },
+            e => { end(); throw late ? timedOut_(late) : e; });
   }
   // Up to limits.length tries, each with its own time limit; 1.5 and 3 seconds between tries. onAgain is told
   // before each new try. T, when given, counts the tries again and the time-outs.
   async function runTried(limits, fn, args, T, onAgain) {
-    let last;
+    let last, backs = 0;
     for (let attempt = 0; attempt < limits.length; attempt++) {
-      try { return await runFor(limits[attempt], fn, args); }
+      try { return await runFor(limits[attempt], fn, args, false, true); }
       catch (e) {
         last = e;
+        // Given up because the customer had been away: send it again at once, without using up a try (six at most).
+        if (e && e.code === 'back' && backs < 6) { backs++; attempt--; continue; }
         if (T && e && e.code === 'timeout') T.timeouts++;
         if (attempt < limits.length - 1) {
           if (T) T.retries++;
@@ -1625,9 +1640,39 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     try {
       runFor(15000, 'noteTimings', [T.token, { result: result, why: why || '', photos: T.photos, sent: T.sent, start: T.start, make: T.make, makeMax: T.makeMax,
         send: T.send, sendMax: T.sendMax, finish: T.finish, total: clock() - T.t0, bytes: T.bytes, originals: T.originals,
-        retries: T.retries, timeouts: T.timeouts, net: netName(), device: deviceName() }], true).catch(() => {});
+        retries: T.retries, timeouts: T.timeouts, away: T.away, backs: T.backs, atOnce: CONFIG.SEND_AT_ONCE,
+        net: netName(), device: deviceName() }], true).catch(() => {});
     } catch (e) { /* the order matters, the note doesn't */ }
   }
+
+  // While an order is being sent the screen is asked to stay on (most current phones allow it), so it does not
+  // lock part way through a big order. The phone hands the screen back whenever the page is hidden, so it is
+  // asked again each time the customer comes back.
+  let awake = null;
+  function holdAwake() {
+    try {
+      if (!navigator.wakeLock || !state.busy || document.visibilityState !== 'visible') return;
+      navigator.wakeLock.request('screen').then(l => { if (state.busy) awake = l; else l.release().catch(() => {}); }).catch(() => {});
+    } catch (e) { /* not allowed here: the order still sends */ }
+  }
+  function letSleep() { try { if (awake) awake.release().catch(() => {}); } catch (e) { /* fine */ } awake = null; }
+  // Leaving the page and coming back while an order is being sent. Time away is counted for the note of figures.
+  let hiddenAt = 0;
+  function cameBack() {
+    if (!hiddenAt) return;
+    const gone = Date.now() - hiddenAt; hiddenAt = 0;
+    if (!state.busy) return;
+    const T = state.timing;
+    if (T) { T.away += gone; T.backs++; }
+    holdAwake();
+    if (gone >= 3000) { flying.forEach(c => c.hurry(5000)); if (state.onBack) state.onBack(); }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { if (state.busy && !hiddenAt) hiddenAt = Date.now(); }
+    else cameBack();
+  });
+  // A connection that has just come back (wifi to data, a tunnel): what was on its way is unlikely to arrive.
+  window.addEventListener('online', () => { if (state.busy) flying.forEach(c => c.hurry(5000)); });
 
   // Tries again twice, after 1.5 and 3 seconds, for a dropped connection.
   async function runRetry() {
@@ -1651,7 +1696,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   async function sendLive(order, files) {
     const N = files.length;
     const T = state.timing = { t0: clock(), token: '', noted: false, photos: N, sent: 0, start: 0, make: 0, makeMax: 0, send: 0, sendMax: 0,
-      finish: 0, bytes: 0, originals: 0, retries: 0, timeouts: 0 };
+      finish: 0, bytes: 0, originals: 0, retries: 0, timeouts: 0, away: 0, backs: 0 };
+    holdAwake();
     setProgress(3, 'Contacting the shop…');
     // Starting the order is not tried twice (a second try would start a second order), so it gets a long limit.
     const started = await runFor(60000, 'startPhotoOrder', [{
@@ -1660,38 +1706,52 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     }]);
     T.start = clock() - T.t0; T.token = started.token;
     order.orderNo = started.orderNo;
-    // Two prints are made and sent at a time. The line under the bar says which print, and whether it is being
-    // made or sent; the bar moves a little when a print is made and the rest of its share when it has arrived.
-    let next = 0, sent = 0, waiting = 0, failed = null;
-    const show = text => setProgress(5 + ((sent + 0.3 * waiting) / N) * 90, text);
+    // CONFIG.SEND_AT_ONCE prints are on their way at a time. They are made one after another (a phone has room for
+    // only so many full-size pictures at once), which takes a fraction of a second each. The line under the bar
+    // counts the prints that have arrived; the bar also moves a little for each one on its way.
+    let next = 0, sent = 0, waiting = 0, failed = null, slow = false;
+    const count = () => (N === 1 ? '' : ' ' + sent + ' of ' + N + ' sent.');
+    const show = lead => setProgress(5 + ((sent + 0.3 * waiting) / N) * 90, (lead || (slow ? 'The connection is slow, so this is taking longer.' : N === 1 ? 'Sending your print…' : 'Sending your prints…')) + count());
+    state.onBack = () => { if (!failed) show('Carrying on where it stopped…'); };
+    let line = Promise.resolve();
+    const make = f => {
+      const p = line.then(async () => {
+        const t1 = clock();
+        const blob = await renderPrint(f.photo);
+        const b64 = await blobToBase64(blob);
+        const made = clock() - t1;
+        T.make += made; T.makeMax = Math.max(T.makeMax, made); T.bytes += blob.size; T.originals += (f.photo.file && f.photo.file.size) || 0;
+        return b64;
+      });
+      line = p.catch(() => {});
+      return p;
+    };
     const worker = async () => {
       while (!failed && next < N) {
-        const f = files[next++], k = next;
+        const f = files[next++];
         try {
-          show('Getting print ' + k + ' of ' + N + ' ready…');
-          const t1 = clock();
-          const blob = await renderPrint(f.photo);
-          const b64 = await blobToBase64(blob);
-          const made = clock() - t1;
-          T.make += made; T.makeMax = Math.max(T.makeMax, made); T.bytes += blob.size; T.originals += (f.photo.file && f.photo.file.size) || 0;
+          const b64 = await make(f);
           if (failed) return;
           waiting++;
-          show('Sending print ' + k + ' of ' + N + '…');
+          show();
           const t2 = clock();
           try {
-            await runTried(sendLimits(b64.length), 'addPhotoFile', [started.token, f.key, f.name, b64], T,
-              () => show('Still sending print ' + k + ' of ' + N + '. The connection is slow, so this is taking longer…'));
+            await runTried(sendLimits(b64.length), 'addPhotoFile', [started.token, f.key, f.name, b64], T, () => { slow = true; show(); });
           } finally {
             waiting--;
             const took = clock() - t2;
             T.send += took; T.sendMax = Math.max(T.sendMax, took);
           }
           sent++; T.sent = sent;
-          show(sent < N ? 'Sent ' + sent + ' of ' + N + '…' : 'All ' + N + (N === 1 ? ' print sent…' : ' prints sent…'));
+          show();
         } catch (e) { failed = failed || e; }
       }
     };
-    await Promise.all([worker(), worker()]);
+    show();
+    const workers = [];
+    for (let i = 0; i < Math.max(1, Math.min(CONFIG.SEND_AT_ONCE, N)); i++) workers.push(worker());
+    await Promise.all(workers);
+    state.onBack = null;
     if (failed) throw failed;
     setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : order.pay === 'basket' ? 'Adding to your basket…' : 'Finishing your order…');
     const t3 = clock();
