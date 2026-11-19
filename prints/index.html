@@ -1506,6 +1506,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       if (isLive) await sendLive(order, files);
       else await makeTestZip(order, files);
     } catch (e) {
+      if (isLive) sendTimings('failed', whyFailed(e));
       fail(cleanError(e));
     }
   }
@@ -1554,6 +1555,80 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       runner[fn].apply(runner, args);
     });
   }
+  // Sending an order (19 Nov 2026). Each call made while an order is being sent has a time limit, so a send that
+  // has stalled is given up and tried again instead of waiting for as long as the phone will. Only on the shop's
+  // own address; the limit stops the request itself.
+  const clock = () => (window.performance && performance.now ? performance.now() : Date.now());
+  function timedOut_() { const e = new Error('timed out'); e.code = 'timeout'; return e; }
+  function runFor(ms, fn, args, keepalive) {
+    if (isAppsScript) {
+      return Promise.race([run.apply(null, [fn].concat(args)), new Promise((res, rej) => setTimeout(() => rej(timedOut_()), ms))]);
+    }
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    let late = false;
+    const timer = setTimeout(() => { late = true; if (ctl) ctl.abort(); }, ms);
+    const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) };
+    if (ctl) opts.signal = ctl.signal;
+    if (keepalive) opts.keepalive = true;
+    return fetch(WEB_APP_URL, opts)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(j => { clearTimeout(timer); if (j.error) throw new Error(j.error); return j.result; },
+            e => { clearTimeout(timer); throw late ? timedOut_() : e; });
+  }
+  // Up to limits.length tries, each with its own time limit; 1.5 and 3 seconds between tries. onAgain is told
+  // before each new try. T, when given, counts the tries again and the time-outs.
+  async function runTried(limits, fn, args, T, onAgain) {
+    let last;
+    for (let attempt = 0; attempt < limits.length; attempt++) {
+      try { return await runFor(limits[attempt], fn, args); }
+      catch (e) {
+        last = e;
+        if (T && e && e.code === 'timeout') T.timeouts++;
+        if (attempt < limits.length - 1) {
+          if (T) T.retries++;
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          if (onAgain) onAgain(e);
+        }
+      }
+    }
+    throw last;
+  }
+  // How long one print file may take to send: 20 seconds, plus a second for every 100 KB. A 6x4 gets about half a
+  // minute. The second try gets twice as long and the third four times, so a slow connection still gets through.
+  function sendLimits(chars) { const base = Math.min(20000 + chars / 100, 180000); return [base, base * 2, base * 4]; }
+
+  // How long sending took (19 Nov 2026). The page times making and sending each print and, when the order is
+  // sent, fails or is left part way, tells the order script: figures, the kind of phone and browser, and the kind
+  // of connection if the browser says. No names, numbers, photos or addresses. If the note doesn't arrive, nothing
+  // else is affected.
+  function deviceName() {
+    const u = navigator.userAgent || '';
+    const os = /iPhone/.test(u) ? 'iPhone' : /iPad/.test(u) ? 'iPad' : /Android/.test(u) ? 'Android' : /Windows/.test(u) ? 'Windows' : /Macintosh/.test(u) ? 'Mac' : 'Other';
+    const v = (u.match(/ OS (\d+)[_.]/) || u.match(/Android (\d+)/) || [])[1] || '';
+    const br = /Instagram/.test(u) ? 'Instagram' : /FBAN|FBAV/.test(u) ? 'Facebook' : /SamsungBrowser/.test(u) ? 'Samsung' : /Edg/.test(u) ? 'Edge'
+      : /FxiOS|Firefox/.test(u) ? 'Firefox' : /CriOS|Chrome\//.test(u) ? 'Chrome' : /Safari/.test(u) ? 'Safari' : 'other';
+    return (os + ' ' + v).trim() + ' ' + br;
+  }
+  function netName() {
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!c) return '';
+    return ((c.effectiveType || '') + ' ' + (typeof c.downlink === 'number' ? c.downlink + 'Mb' : '') + (c.saveData ? ' saver' : '')).trim();
+  }
+  function whyFailed(e) {
+    if (e && e.code === 'timeout') return 'timeout';
+    return /network|connection failure|http \d|failed to fetch|load failed|offline/i.test(String((e && e.message) || e || '')) ? 'network' : 'script';
+  }
+  function sendTimings(result, why) {
+    const T = state.timing;
+    if (!T || !T.token || T.noted || isAppsScript) return;
+    T.noted = true;
+    try {
+      runFor(15000, 'noteTimings', [T.token, { result: result, why: why || '', photos: T.photos, sent: T.sent, start: T.start, make: T.make, makeMax: T.makeMax,
+        send: T.send, sendMax: T.sendMax, finish: T.finish, total: clock() - T.t0, bytes: T.bytes, originals: T.originals,
+        retries: T.retries, timeouts: T.timeouts, net: netName(), device: deviceName() }], true).catch(() => {});
+    } catch (e) { /* the order matters, the note doesn't */ }
+  }
+
   // Tries again twice, after 1.5 and 3 seconds, for a dropped connection.
   async function runRetry() {
     let last;
@@ -1574,41 +1649,67 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
   }
   async function sendLive(order, files) {
+    const N = files.length;
+    const T = state.timing = { t0: clock(), token: '', noted: false, photos: N, sent: 0, start: 0, make: 0, makeMax: 0, send: 0, sendMax: 0,
+      finish: 0, bytes: 0, originals: 0, retries: 0, timeouts: 0 };
     setProgress(3, 'Contacting the shop…');
-    const started = await run('startPhotoOrder', {
+    // Starting the order is not tried twice (a second try would start a second order), so it gets a long limit.
+    const started = await runFor(60000, 'startPhotoOrder', [{
       customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files),
       src: (window.PDBasket && window.PDBasket.from ? window.PDBasket.from() : '')
-    });
+    }]);
+    T.start = clock() - T.t0; T.token = started.token;
     order.orderNo = started.orderNo;
-    // Two prints are made and sent at a time.
-    let next = 0, sent = 0, failed = null;
+    // Two prints are made and sent at a time. The line under the bar says which print, and whether it is being
+    // made or sent; the bar moves a little when a print is made and the rest of its share when it has arrived.
+    let next = 0, sent = 0, waiting = 0, failed = null;
+    const show = text => setProgress(5 + ((sent + 0.3 * waiting) / N) * 90, text);
     const worker = async () => {
-      while (!failed && next < files.length) {
-        const f = files[next++];
+      while (!failed && next < N) {
+        const f = files[next++], k = next;
         try {
-          const b64 = await blobToBase64(await renderPrint(f.photo));
+          show('Getting print ' + k + ' of ' + N + ' ready…');
+          const t1 = clock();
+          const blob = await renderPrint(f.photo);
+          const b64 = await blobToBase64(blob);
+          const made = clock() - t1;
+          T.make += made; T.makeMax = Math.max(T.makeMax, made); T.bytes += blob.size; T.originals += (f.photo.file && f.photo.file.size) || 0;
           if (failed) return;
-          await runRetry('addPhotoFile', started.token, f.key, f.name, b64);
-          sent++;
-          setProgress(5 + (sent / files.length) * 90, 'Sending print ' + sent + ' of ' + files.length + '…');
+          waiting++;
+          show('Sending print ' + k + ' of ' + N + '…');
+          const t2 = clock();
+          try {
+            await runTried(sendLimits(b64.length), 'addPhotoFile', [started.token, f.key, f.name, b64], T,
+              () => show('Still sending print ' + k + ' of ' + N + '. The connection is slow, so this is taking longer…'));
+          } finally {
+            waiting--;
+            const took = clock() - t2;
+            T.send += took; T.sendMax = Math.max(T.sendMax, took);
+          }
+          sent++; T.sent = sent;
+          show(sent < N ? 'Sent ' + sent + ' of ' + N + '…' : 'All ' + N + (N === 1 ? ' print sent…' : ' prints sent…'));
         } catch (e) { failed = failed || e; }
       }
     };
-    setProgress(5, 'Sending print 1 of ' + files.length + '…');
     await Promise.all([worker(), worker()]);
     if (failed) throw failed;
     setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : order.pay === 'basket' ? 'Adding to your basket…' : 'Finishing your order…');
-    const res = await runRetry('finishPhotoOrder', started.token, pageUrl());
-    if (res && res.status === 'held') { setProgress(100, 'Added'); return addedToBasket(order, res, started.token); }
+    const t3 = clock();
+    // Finishing can be asked for again safely: the order script gives the same answer.
+    const res = await runTried([60000, 90000, 120000], 'finishPhotoOrder', [started.token, pageUrl()], T);
+    T.finish = clock() - t3;
+    if (res && res.status === 'held') { setProgress(100, 'Added'); sendTimings('basket'); return addedToBasket(order, res, started.token); }
     if (res && res.status === 'pay') {
       // The photos are with the shop's order script; they reach the shop once Stripe says the order is paid.
       if (!res.payUrl) throw new Error("Paying online isn't working just now. Please call us on " + SHOP_PHONE + '.');
       pending.set({ order: res.orderNo, token: started.token, at: Date.now() });
       state.leaving = true;   // no "leave this page?" question on the way to Stripe
+      sendTimings('pay');
       location.assign(res.payUrl);
       return;
     }
     setProgress(100, 'Sent');
+    sendTimings('sent');
     showDone(Object.assign(order, res || {}), 'sent');
   }
 
@@ -1893,6 +1994,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     });
     document.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
     document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
+    window.addEventListener('pagehide', () => { if (state.busy && isLive) sendTimings('left'); });
     window.addEventListener('beforeunload', e => { if (state.photos.length && state.step !== 'done' && !state.leaving) { e.preventDefault(); e.returnValue = ''; } });
     document.querySelectorAll('input[name="collect"]').forEach(r => r.addEventListener('change', showPayWords));
 
