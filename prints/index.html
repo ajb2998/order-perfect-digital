@@ -578,6 +578,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   // and more) instead of being paid for here. Needs the basket switched on and the order script to take basket orders.
   let BASKET = false;
   let setupReady = Promise.resolve();
+  // Order script version 13 and later: starting an order can be asked for again (it says so in its set-up answer).
+  let STARTS_AGAIN = false;
   const pageUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
   const state = {
     photos: [], size: CONFIG.DEFAULT_SIZE, finish: FINISHES[0], mode: 'fill',
@@ -1509,6 +1511,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       else await makeTestZip(order, files);
     } catch (e) {
       if (isLive) sendTimings('failed', whyFailed(e));
+      if (e && e.code === 'script') state.resume = null;
       fail(cleanError(e));
     } finally {
       state.onBack = null;
@@ -1569,48 +1572,110 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
   // lock screen, and what was on its way then is usually lost. When the customer comes back, each of these gets
   // five more seconds to answer and is then given up and sent again straight away (code 'back', not 'timeout').
   const flying = new Set();
+  // ms is the time limit: a number, or a function that gives the limit as it stands now, so a limit can shorten
+  // while the call is on its way (see sendLimits). The limit is looked at a few times a second. Time the page spent
+  // hidden does not count: the phone had stopped the page, and coming back has its own rule (hurry).
+  let hiddenAt = 0, awayMs = 0;
   function runFor(ms, fn, args, keepalive, again) {
+    const due = typeof ms === 'function' ? ms : () => ms;
     if (isAppsScript) {
-      return Promise.race([run.apply(null, [fn].concat(args)), new Promise((res, rej) => setTimeout(() => rej(timedOut_()), ms))]);
+      return Promise.race([run.apply(null, [fn].concat(args)), new Promise((res, rej) => setTimeout(() => rej(timedOut_()), due()))]);
     }
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    let late = '';
-    const stop = code => { late = code; if (ctl) ctl.abort(); };
-    let timer = setTimeout(() => stop('timeout'), ms);
-    const call = { hurry: wait => { clearTimeout(timer); timer = setTimeout(() => stop('back'), wait); } };
+    let late = '', back = 0;
+    const t0 = Date.now(), away0 = awayMs;
+    const stop = code => { if (!late) { late = code; if (ctl) ctl.abort(); } };
+    const timer = setInterval(() => {
+      if (hiddenAt || document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (back) { if (now >= back) stop('back'); }
+      else if (now - t0 - (awayMs - away0) >= due()) stop('timeout');
+    }, 300);
+    const call = { hurry: wait => { back = Date.now() + wait; } };
     if (again) flying.add(call);
-    const end = () => { clearTimeout(timer); flying.delete(call); };
+    const end = () => { clearInterval(timer); flying.delete(call); };
     const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) };
     if (ctl) opts.signal = ctl.signal;
     if (keepalive) opts.keepalive = true;
     return fetch(WEB_APP_URL, opts)
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(j => { end(); if (j.error) throw new Error(j.error); return j.result; },
+      .then(j => { end(); if (j.error) { const e = new Error(j.error); e.code = 'script'; throw e; } return j.result; },
             e => { end(); throw late ? timedOut_(late) : e; });
   }
-  // Up to limits.length tries, each with its own time limit; 1.5 and 3 seconds between tries. onAgain is told
-  // before each new try. T, when given, counts the tries again and the time-outs.
-  async function runTried(limits, fn, args, T, onAgain) {
-    let last, backs = 0;
+  // Calls that do not come back (19 Nov 2026). About one call in three to the order script was found never to
+  // answer, though the script had usually done its work. So every call has a time limit and is asked again:
+  //  - a call that ran out of time is asked again at once (waiting does not help);
+  //  - a call that failed on the connection is asked again after 1.5, 3, then 4 seconds;
+  //  - an answer from the script that is a message for the customer is shown, not asked again, except "we are busy"
+  //    and "some photos didn't arrive", which get two more tries as they always did.
+  // limits has one time limit per try. o: T counts tries and time-outs for the note of figures; onAgain is told
+  // before each new try; gate limits how many are on their way at once; onGood is told how long a try that worked took.
+  async function runTried(limits, fn, args, o) {
+    o = o || {};
+    let last, backs = 0, waits = 0, said = 0;
     for (let attempt = 0; attempt < limits.length; attempt++) {
-      try { return await runFor(limits[attempt], fn, args, false, true); }
-      catch (e) {
+      if (o.gate) await o.gate.enter();
+      const a0 = Date.now();
+      try {
+        const res = await runFor(limits[attempt], fn, args, false, true);
+        if (o.onGood) o.onGood(Date.now() - a0);
+        return res;
+      } catch (e) {
         last = e;
+        const code = e && e.code;
         // Given up because the customer had been away: send it again at once, without using up a try (six at most).
-        if (e && e.code === 'back' && backs < 6) { backs++; attempt--; continue; }
-        if (T && e && e.code === 'timeout') T.timeouts++;
+        if (code === 'back' && backs < 6) { backs++; attempt--; continue; }
+        if (code === 'script' && !(/busy|didn.t arrive/i.test(e.message) && said++ < 2)) throw e;
+        if (o.T && code === 'timeout') o.T.timeouts++;
         if (attempt < limits.length - 1) {
-          if (T) T.retries++;
-          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
-          if (onAgain) onAgain(e);
+          if (o.T) o.T.retries++;
+          if (o.onAgain) o.onAgain(e);
+          if (code !== 'timeout') await new Promise(r => setTimeout(r, Math.min(1500 * ++waits, 4000)));
         }
+      } finally {
+        if (o.gate) o.gate.leave();
       }
     }
     throw last;
   }
-  // How long one print file may take to send: 20 seconds, plus a second for every 100 KB. A 6x4 gets about half a
-  // minute. The second try gets twice as long and the third four times, so a slow connection still gets through.
-  function sendLimits(chars) { const base = Math.min(20000 + chars / 100, 180000); return [base, base * 2, base * 4]; }
+  // How many print files are on their way at once. The number can be lowered while they are going.
+  function makeGate(n) {
+    const g = { cap: n, busy: 0, line: [] };
+    g.enter = () => new Promise(res => { const go = () => { g.busy++; res(); }; if (g.busy < g.cap) go(); else g.line.push(go); });
+    g.leave = () => { g.busy--; while (g.busy < g.cap && g.line.length) g.line.shift()(); };
+    return g;
+  }
+  // Time limits for sending one print file, eight tries. The longest it should ever need is "base": 20 seconds plus
+  // a second for every 100 KB (about half a minute for a 6x4). Once two print files of this order have arrived the
+  // page knows how quick this connection is, and the first three tries get a "quick" limit instead: twice the
+  // slowest that arrived (allowing for size) plus 3 seconds, never under 8 seconds or over base. A print already on
+  // its way is held to the quick limit as soon as it is known, so one that is stuck is given up in seconds.
+  // Later tries get base, twice base and four times base, so a connection that is only slow still gets through.
+  // A slow connection (two tries run out of time before anything has arrived): one print at a time, three times as long.
+  function newPace() { return { good: [], early: 0, slow: false }; }
+  function baseLimit(chars) { return Math.min(20000 + chars / 100, 180000); }
+  function quickLimit(pace, chars) {
+    const base = baseLimit(chars);
+    if (pace.good.length < 2) return base;
+    let worst = 0;
+    for (const g of pace.good) worst = Math.max(worst, g.ms * Math.max(1, chars / g.chars));
+    return Math.max(8000, Math.min(base, worst * 2 + 3000));
+  }
+  function sendLimits(pace, chars) {
+    const base = baseLimit(chars);
+    const quick = () => (pace.slow ? base * 3 : quickLimit(pace, chars));
+    const longer = (a, b) => () => base * (pace.slow ? b : a);
+    return [quick, quick, quick, longer(1, 3), longer(1, 3), longer(2, 4), longer(2, 4), longer(4, 6)];
+  }
+  // Starting and finishing are safe to ask for again while the first ask is still being worked on (the script
+  // gives the same answer to both), so their first limits are short: a call that is stuck costs seconds.
+  const START_LIMITS = [10000, 12000, 20000, 30000, 45000, 60000];
+  const FINISH_LIMITS = [12000, 15000, 25000, 40000, 60000, 90000, 120000];
+  function newId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* made below */ }
+    let s = ''; for (let i = 0; i < 32; i++) s += Math.floor(Math.random() * 16).toString(16);
+    return s;
+  }
 
   // How long sending took (19 Nov 2026). The page times making and sending each print and, when the order is
   // sent, fails or is left part way, tells the order script: figures, the kind of phone and browser, and the kind
@@ -1656,11 +1721,11 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     } catch (e) { /* not allowed here: the order still sends */ }
   }
   function letSleep() { try { if (awake) awake.release().catch(() => {}); } catch (e) { /* fine */ } awake = null; }
-  // Leaving the page and coming back while an order is being sent. Time away is counted for the note of figures.
-  let hiddenAt = 0;
+  // Leaving the page and coming back. Time away is taken off the clock of every call on its way (runFor) and,
+  // while an order is being sent, counted for the note of figures.
   function cameBack() {
     if (!hiddenAt) return;
-    const gone = Date.now() - hiddenAt; hiddenAt = 0;
+    const gone = Date.now() - hiddenAt; hiddenAt = 0; awayMs += gone;
     if (!state.busy) return;
     const T = state.timing;
     if (T) { T.away += gone; T.backs++; }
@@ -1668,20 +1733,18 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     if (gone >= 3000) { flying.forEach(c => c.hurry(5000)); if (state.onBack) state.onBack(); }
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { if (state.busy && !hiddenAt) hiddenAt = Date.now(); }
+    if (document.visibilityState === 'hidden') { if (!hiddenAt) hiddenAt = Date.now(); }
     else cameBack();
   });
   // A connection that has just come back (wifi to data, a tunnel): what was on its way is unlikely to arrive.
   window.addEventListener('online', () => { if (state.busy) flying.forEach(c => c.hurry(5000)); });
 
-  // Tries again twice, after 1.5 and 3 seconds, for a dropped connection.
-  async function runRetry() {
-    let last;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try { return await run.apply(null, arguments); }
-      catch (e) { last = e; if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); }
-    }
-    throw last;
+  // The other calls to the order script: the set-up when the page opens, and coming back from paying. Each can be
+  // asked again safely (the script gives the same answer), so each gets five tries with a time limit.
+  function runRetry(fn) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    if (isAppsScript) return run.apply(null, arguments);
+    return runTried(fn === 'getSetup' ? [8000, 8000, 12000, 20000, 30000] : [25000, 25000, 40000, 60000, 90000], fn, args);
   }
   function cleanError(e) {
     const msg = String((e && e.message) || e || '').replace(/^(Exception|Error|ScriptError):\s*/i, '').trim();
@@ -1699,19 +1762,35 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       finish: 0, bytes: 0, originals: 0, retries: 0, timeouts: 0, away: 0, backs: 0 };
     holdAwake();
     setProgress(3, 'Contacting the shop…');
-    // Starting the order is not tried twice (a second try would start a second order), so it gets a long limit.
-    const started = await runFor(60000, 'startPhotoOrder', [{
-      customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files),
-      src: (window.PDBasket && window.PDBasket.from ? window.PDBasket.from() : '')
-    }]);
+    // An order that failed part way is carried on when the customer presses send again, as long as nothing in it has
+    // changed (the same photos, sizes, copies, crops and details) and it is under an hour old: the prints that
+    // arrived are not sent again. Anything changed, and a new order is started.
+    const sig = JSON.stringify([order.customer, order.collect, order.pay, order.total,
+      files.map(f => [f.key, f.name, f.photo.id, modeOf(f.photo), cropOf(f.photo), (f.photo.file && f.photo.file.size) || 0])]);
+    let R = state.resume;
+    if (!(R && R.sig === sig && Date.now() - R.at < 3600000)) R = state.resume = null;
+    let started = R ? { token: R.token, orderNo: R.orderNo } : null;
+    if (!started) {
+      // Starting the order. Script version 13 starts it once however often it is asked (the same id goes with each
+      // ask). Before that a second ask would start a second order, so there is one try with a long limit.
+      const ask = { customer: order.customer, collect: order.collect, pay: order.pay, total: order.total, prints: order.prints, specs: folderSpecs(files),
+        src: (window.PDBasket && window.PDBasket.from ? window.PDBasket.from() : ''), rid: newId() };
+      started = STARTS_AGAIN
+        ? await runTried(START_LIMITS, 'startPhotoOrder', [ask], { T: T, onAgain: () => setProgress(3, 'Still contacting the shop…') })
+        : await runFor(60000, 'startPhotoOrder', [ask]);
+      R = state.resume = { sig: sig, token: started.token, orderNo: started.orderNo, sent: {}, at: Date.now() };
+    }
     T.start = clock() - T.t0; T.token = started.token;
     order.orderNo = started.orderNo;
     // CONFIG.SEND_AT_ONCE prints are on their way at a time. They are made one after another (a phone has room for
     // only so many full-size pictures at once), which takes a fraction of a second each. The line under the bar
     // counts the prints that have arrived; the bar also moves a little for each one on its way.
-    let next = 0, sent = 0, waiting = 0, failed = null, slow = false;
+    const todo = files.filter(f => !R.sent[f.name]);
+    const pace = newPace(), gate = makeGate(Math.max(1, CONFIG.SEND_AT_ONCE));
+    let next = 0, sent = N - todo.length, waiting = 0, failed = null, slow = false;
+    T.sent = sent;
     const count = () => (N === 1 ? '' : ' ' + sent + ' of ' + N + ' sent.');
-    const show = lead => setProgress(5 + ((sent + 0.3 * waiting) / N) * 90, (lead || (slow ? 'The connection is slow, so this is taking longer.' : N === 1 ? 'Sending your print…' : 'Sending your prints…')) + count());
+    const show = lead => setProgress(5 + ((sent + 0.3 * waiting) / N) * 90, (lead || (slow ? 'Still sending. This is taking longer than usual.' : N === 1 ? 'Sending your print…' : 'Sending your prints…')) + count());
     state.onBack = () => { if (!failed) show('Carrying on where it stopped…'); };
     let line = Promise.resolve();
     const make = f => {
@@ -1727,8 +1806,8 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       return p;
     };
     const worker = async () => {
-      while (!failed && next < N) {
-        const f = files[next++];
+      while (!failed && next < todo.length) {
+        const f = todo[next++];
         try {
           const b64 = await make(f);
           if (failed) return;
@@ -1736,12 +1815,25 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
           show();
           const t2 = clock();
           try {
-            await runTried(sendLimits(b64.length), 'addPhotoFile', [started.token, f.key, f.name, b64], T, () => { slow = true; show(); });
+            await runTried(sendLimits(pace, b64.length), 'addPhotoFile', [started.token, f.key, f.name, b64], {
+              T: T, gate: gate,
+              onGood: ms => {
+                pace.good.push({ ms: ms, chars: b64.length });
+                if (pace.good.length > 12) pace.good.shift();
+                // Not a slow connection after all (the first sends were only stuck): back to several at once.
+                if (pace.slow && pace.good.length >= 2 && pace.good.slice(-2).every(g => g.ms < 10000)) { pace.slow = false; gate.cap = Math.max(1, CONFIG.SEND_AT_ONCE); }
+              },
+              onAgain: e => {
+                slow = true; show();
+                if (e && e.code === 'timeout' && !pace.good.length && ++pace.early >= 2 && !pace.slow) { pace.slow = true; gate.cap = 1; }
+              }
+            });
           } finally {
             waiting--;
             const took = clock() - t2;
             T.send += took; T.sendMax = Math.max(T.sendMax, took);
           }
+          R.sent[f.name] = true;
           sent++; T.sent = sent;
           show();
         } catch (e) { failed = failed || e; }
@@ -1749,15 +1841,16 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
     };
     show();
     const workers = [];
-    for (let i = 0; i < Math.max(1, Math.min(CONFIG.SEND_AT_ONCE, N)); i++) workers.push(worker());
+    for (let i = 0; i < Math.max(1, Math.min(CONFIG.SEND_AT_ONCE, todo.length)); i++) workers.push(worker());
     await Promise.all(workers);
     state.onBack = null;
     if (failed) throw failed;
     setProgress(97, order.pay === 'online' ? 'Opening the payment page…' : order.pay === 'basket' ? 'Adding to your basket…' : 'Finishing your order…');
     const t3 = clock();
     // Finishing can be asked for again safely: the order script gives the same answer.
-    const res = await runTried([60000, 90000, 120000], 'finishPhotoOrder', [started.token, pageUrl()], T);
+    const res = await runTried(FINISH_LIMITS, 'finishPhotoOrder', [started.token, pageUrl()], { T: T });
     T.finish = clock() - t3;
+    state.resume = null;
     if (res && res.status === 'held') { setProgress(100, 'Added'); sendTimings('basket'); return addedToBasket(order, res, started.token); }
     if (res && res.status === 'pay') {
       // The photos are with the shop's order script; they reach the shop once Stripe says the order is paid.
@@ -2063,6 +2156,7 @@ footer { margin-top: 28px; font-size: var(--s-1); color: var(--muted); display: 
       const basketOn = window.PDBasket ? window.PDBasket.enabled() : Promise.resolve(false);
       setupReady = runRetry('getSetup').then(s => basketOn.then(on => {
         ONLINE = !!(s && s.online);
+        STARTS_AGAIN = !!(s && s.again);
         BASKET = on && ONLINE && !!(s && s.basket);
         showPayWords();
       })).catch(() => { /* the page carries on without it */ });

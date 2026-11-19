@@ -100,17 +100,35 @@
   }
 
   // The order scripts take {fn, arg}; the photo orders script takes {fn, args: [...]}.
+  // Calls to the photo orders script get a time limit and are asked again (19 Nov 2026): about one call in three to
+  // that script was found not to come back, though the script had usually done its work. The calls the basket
+  // makes to it (basketAttach, basketConfirm, payPhotoInShop) give the same answer however often they are asked.
+  // Calls to the other two scripts are made once with no limit, as before.
+  var PHOTO_LIMITS = [12000, 12000, 20000, 30000, 45000];
+  function once(url, body, ms) {
+    var ctl = ms && typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, ms) : 0;
+    var lost = function (msg) { var e = new Error(msg); e.again = true; return e; };
+    var opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) };
+    if (ctl) opts.signal = ctl.signal;
+    return fetch(url, opts)
+      .then(function (r) {
+        if (!r.ok) throw lost('The shop could not be reached (' + r.status + '). Please try again.');
+        return r.json();
+      }, function () { throw lost('We could not reach the shop. Please check your connection and try again.'); })
+      .then(function (j) { clearTimeout(timer); if (j.error) throw new Error(j.error); return j.result; },
+            function (e) { clearTimeout(timer); throw e && e.again ? e : lost('We could not reach the shop. Please check your connection and try again.'); });
+  }
   function call(script, fn, arg) {
     var url = SCRIPTS[script];
     if (!url) return Promise.reject(new Error('Unknown order script.'));
     var body = script === 'photo' ? { fn: fn, args: [arg] } : { fn: fn, arg: arg };
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
-      .catch(function () { throw new Error('We could not reach the shop. Please check your connection and try again.'); })
-      .then(function (r) {
-        if (!r.ok) throw new Error('The shop could not be reached (' + r.status + '). Please try again.');
-        return r.json();
-      })
-      .then(function (j) { if (j.error) throw new Error(j.error); return j.result; });
+    if (script !== 'photo') return once(url, body, 0);
+    var i = 0;
+    var go = function () {
+      return once(url, body, PHOTO_LIMITS[i]).catch(function (e) { if (e && e.again && ++i < PHOTO_LIMITS.length) return go(); throw e; });
+    };
+    return go();
   }
 
   // A small picture for the basket list, from a canvas, an image or a data URL (about 7 KB).
